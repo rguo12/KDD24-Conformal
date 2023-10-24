@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 from models.model import *
-from models.causal_models import *
+# from models.causal_models import *
 from sklearn.model_selection import train_test_split
 
 

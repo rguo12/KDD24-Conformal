@@ -1,9 +1,12 @@
 import numpy as np
+
 import jax.numpy as jnp
 import jax
-import pandas as pd
+import jax.random as random
 from jax.scipy.stats import norm, beta
 from jax.scipy.special import erfinv
+
+import pandas as pd
 import os
 
 TRAIN_DATASET = "./data/IHDP/ihdp_npci_1-100.train.npz"
@@ -137,17 +140,27 @@ def generate_data(rng_key, n_observation, n_intervention, d, gamma, alpha, confo
     
     # Generate observation data
     rng_key, _ = jax.random.split(rng_key)
-    X = jax.random.uniform(rng_key, shape=(n_observation, d))
+    
+    X = jax.random.uniform(rng_key, shape=(n_observation, d)) # d-dimensional Uniform random variable X
+
     if confouding:
         rng_key, _ = jax.random.split(rng_key)
+
+        # d-dimensional normal random variable U
         U = jnp.abs(jax.random.normal(rng_key, shape=(n_observation, d)))
+        
+        # tau is a function of U
         tau = (2 / (1 + jnp.exp(-12 * ((U[:, 0] + U[:, 0]) / 2 - 0.5)))) * (2 / (1 + jnp.exp(-12 * ((U[:, 1] + U[:, 1]) / 2 - 0.5)))) 
         tau = tau.reshape((-1,))
+
+        # tau_0 is a function of tau
         tau_0 = gamma * tau 
         # std = -jnp.log(jnp.minimum((U[:, 0] + U[:, 0]) / 2 + 1e-9, 0.99))
         std = 1.0
         ps = (1 + beta.cdf((U[:, 0] + U[:, 0]) / 2, 2, 4)) / 4
+
     else:
+
         tau = (2 / (1 + jnp.exp(-12 * (X[:, 0] - 0.5)))) * (2 / (1 + jnp.exp(-12 * (X[:, 1] - 0.5)))) 
         tau = tau.reshape((-1,))
         tau_0 = gamma * tau 
@@ -159,7 +172,10 @@ def generate_data(rng_key, n_observation, n_intervention, d, gamma, alpha, confo
     rng_key, _ = jax.random.split(rng_key)
     err_0 = jax.random.normal(rng_key, shape=(n_observation, ))
 
-    Y0 = tau_0 + 1 * err_0  
+    # Y0 = tau_0 + err_0 = gamma * tau_0 + err_0
+    Y0 = tau_0 + 1 * err_0
+
+    # Y1 = tau + sqrt(std) * errdist  
     Y1 = tau + jnp.sqrt(std) * errdist
     rng_key , _ = jax.random.split(rng_key)
     T = jax.random.uniform(rng_key, shape=(n_observation, )) < ps
@@ -219,7 +235,124 @@ def generate_data(rng_key, n_observation, n_intervention, d, gamma, alpha, confo
     return df_observation, df_intervention
 
 
+def generate_cevae_data(rng_key, n_observation, n_intervention, d:int = 1, 
+                        err_scale: float = 0.1, ps_strength:float = 0.6):
+    
+    # def correlated_covariates(rng_key, n, d):
+    #     rho = 0.9
+    #     rng_key, _ = jax.random.split(rng_key)
+    #     X = jax.random.normal(rng_key, shape=(n, d))
+    #     fac = jax.random.normal(rng_key, shape=(n, d))
+    #     X = X * jnp.sqrt(1 - rho) + fac * jnp.sqrt(rho)
+    #     return norm.cdf(X)
+
+    # U \sim Bern(0.5)
+    # X \sim N(U,sigma_z0**2*(1-U)+sigma_z1**2*(U))
+    # T \sim Bern(0.75*U+0.25*(1-U))
+    # Y \sim Sigmoid(3*(U+(2T-1)))
+    
+    # Generate observation data
+    # rng_key, _ = jax.random.split(rng_key)
+    
+    # generate data
+    rng_key, _ = jax.random.split(rng_key)
+
+    key = random.PRNGKey(1701)
+
+    # d-dimensional bern random variable U as hidden confounders
+    # U = jnp.abs(jax.random.normal(rng_key, shape=(n_observation, d)))
+
+    sigma_z1 = 3.0
+    sigma_z0 = 5.0
+
+    n = n_observation
+
+    U = jax.random.normal(rng_key, shape=(n, 1))
+    # U = jax.random.bernoulli(key, p=0.5, shape=(n, 1))
+    mean_X = U
+    variance_X = sigma_z0**2*(1-U)+sigma_z1**2*(U)
+
+    # X = jax.random.multivariate_normal(key, mean_X, variance_X, shape=(n_observation, d))
+    X = jax.random.normal(rng_key, shape=(n, d))
+
+    X = X * variance_X + mean_X
+    ps = ps_strength*U+(1-ps_strength)*(1-U)
+    T = jax.random.bernoulli(rng_key, p=ps, shape=(n,1))
+
+    rng_key, _ = jax.random.split(rng_key)
+    errY1 = jax.random.normal(rng_key, shape=(n_observation,1 )) * err_scale
+    rng_key, _ = jax.random.split(rng_key)
+    errY0 = jax.random.normal(rng_key, shape=(n_observation,1 )) * err_scale
+
+    tau1 = jax.nn.sigmoid(3.0*(U+2))
+    tau0 = jax.nn.sigmoid(3.0*(U-2))
+
+    Y1 = tau1 + errY1
+    Y0 = tau0 + errY0
+    # Y1 = 3.0*(U+2)
+    # Y0 = 3.0*(U-2)
+    # Y1 = jax.random.bernoulli(rng_key, p=jax.nn.sigmoid(3.0*(U+2)), shape=(n,1)).astype('float16')
+    # Y0 = jax.random.bernoulli(rng_key, p=jax.nn.sigmoid(3.0*(U-2)), shape=(n,1)).astype('float16')
+
+    Y = Y0.copy()
+    Y = Y.at[T].set(Y1[T])
+    
+    data_observation = jnp.column_stack((X, T, Y))
+    column_names = [f'X{i}' for i in range(1, d+1)] + ['T', 'Y']
+    df_observation = pd.DataFrame(data_observation, columns=column_names)
+    df_observation["ps"] = jnp.array(ps).reshape((-1,))
+    df_observation["Y1"] = Y1.reshape((-1,))
+    df_observation["Y0"] = Y0.reshape((-1,))
+    df_observation["CATE"] = Y1 - Y0
+    # df_observation["width"] = jnp.mean(jnp.sqrt(2)*(jnp.sqrt(2)*std) * erfinv(2*(1-(alpha/2))-1) * 2) 
+
+    n = n_intervention
+    # Generate intervention data
+    U = jax.random.bernoulli(key, p=0.5, shape=(n, 1))
+    mean_X = U
+    variance_X = sigma_z0**2*(1-U)+sigma_z1**2*(U)
+
+    # X = jax.random.multivariate_normal(key, mean_X, variance_X, shape=(n_observation, d))
+    X = jax.random.normal(rng_key, shape=(n, d))
+
+    X = X * variance_X + mean_X
+    ps = 0.5 * jnp.ones(shape=(n,1))
+    T = jax.random.bernoulli(rng_key, p=ps, shape=(n,1))
+
+    rng_key, _ = jax.random.split(rng_key)
+    errY1 = jax.random.normal(rng_key, shape=(n,1 )) * err_scale
+    rng_key, _ = jax.random.split(rng_key)
+    errY0 = jax.random.normal(rng_key, shape=(n,1 )) * err_scale
+
+    # Y1 = jax.random.bernoulli(rng_key, p=jax.nn.sigmoid(3.0*(U+2)), shape=(n,1)).astype('float16')
+    # Y0 = jax.random.bernoulli(rng_key, p=jax.nn.sigmoid(3.0*(U-2)), shape=(n,1)).astype('float16')
+
+    tau1 = jax.nn.sigmoid(3.0*(U+2))
+    tau0 = jax.nn.sigmoid(3.0*(U-2))
+
+    Y1 = tau1 + errY1
+    Y0 = tau0 + errY0
+
+    # Y1 = 3.0*(U+2)
+    # Y0 = 3.0*(U-2)
+
+    Y = Y0.copy()
+    Y = Y.at[T].set(Y1[T])
+    
+    data_intervention = jnp.column_stack((X, T, Y))
+    column_names = [f'X{i}' for i in range(1, d+1)] + ['T', 'Y']
+    df_intervention = pd.DataFrame(data_intervention, columns=column_names)
+    df_intervention["ps"] = jnp.array(ps).reshape((-1,))
+    df_intervention["Y1"] = Y1.reshape((-1,))
+    df_intervention["Y0"] = Y0.reshape((-1,))
+    df_intervention["CATE"] = Y1 - Y0
+    # df_intervention["width"] = jnp.mean(jnp.sqrt(2)*(jnp.sqrt(2)*std)*erfinv(2*(1-(alpha/2))-1) * 2) 
+
+    return df_observation, df_intervention
+
+
 def generate_lilei_hua_data():
+
     # Replicate the demo from https://lihualei71.github.io/cfcausal/articles/cfcausal_demo.html
     np.random.seed(2020)
 
