@@ -22,7 +22,7 @@ def main(args):
     synthetic_setups = dict({"A": 1, "B": 0})
     setup = 'A'
     alpha = 0.1
-    test_frac = 0.01
+    test_frac = 0.1
     # df_train, df_test = generate_lilei_hua_data()
     # _ = weighted_conformal_prediction([df_train, df_test], 
     #                                   metalearner="DR", 
@@ -49,7 +49,7 @@ def main(args):
                                         test_frac=test_frac,
                                         method="counterfactual")
     
-    print("Transductive weighted conformal prediction (Ours)")
+    print("Weighted conformal prediction (Ours)")
     print('Coverage of Y(0)', coverage_0)
     print('Interval width of Y(0)', interval_width_0)
     print('Coverage of Y(1)', coverage_1)
