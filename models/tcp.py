@@ -1,8 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
 import sys, os, time
-import jax.numpy as jnp
-import jax
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, GradientBoostingClassifier
@@ -93,33 +91,33 @@ class TCP:
         X_train_inter_0 = self.X_train_inter[self.T_train_inter==0, :]
         Y_train_inter_0 = self.Y_train_inter[self.T_train_inter==0]
 
-        D_train_0 = jnp.concatenate((X_train_obs_0, Y_train_obs_0[:, None]), axis=1)
-        D_inter_0 = jnp.concatenate((X_train_inter_0, Y_train_inter_0[:, None]), axis=1)
+        D_train_0 = np.concatenate((X_train_obs_0, Y_train_obs_0[:, None]), axis=1)
+        D_inter_0 = np.concatenate((X_train_inter_0, Y_train_inter_0[:, None]), axis=1)
 
-        self.density_models_0 = densratio(np.array(D_inter_0), np.array(D_train_0), alpha=0.01)
-        weights_train_0 = self.density_models_0.compute_density_ratio(np.array(D_train_0))
+        self.density_models_0 = densratio(D_inter_0, D_train_0, alpha=0.01)
+        weights_train_0 = self.density_models_0.compute_density_ratio(D_train_0)
         
         self.fit(X_train_obs_0, Y_train_obs_0, T=0)
         Y_interval_0_min = self.models_0.predict(X_test) - 3 * Y_train_inter_0.std()
         Y_interval_0_max = self.models_0.predict(X_test) + 3 * Y_train_inter_0.std()
-        Y_interval_0 = jnp.linspace(Y_interval_0_min, Y_interval_0_max, 50).T
-        y_test_0_min, y_test_0_max = jnp.zeros(len(X_test)), jnp.zeros(len(X_test))
+        Y_interval_0 = np.linspace(Y_interval_0_min, Y_interval_0_max, 50).T
+        y_test_0_min, y_test_0_max = np.zeros(len(X_test)), np.zeros(len(X_test))
         
         for i, x_test in enumerate(tqdm(X_test)):
-            X_train_test_mixed = jnp.concatenate((X_train_obs_0, x_test[None, :]), axis=0)
+            X_train_test_mixed = np.concatenate((X_train_obs_0, x_test[None, :]), axis=0)
             y_interval = []
             for y in Y_interval_0[i, :]:
-                weight_test = self.density_models_0.compute_density_ratio(np.array(jnp.concatenate((x_test, jnp.array([y])), axis=0)[None, :]))
-                Y_train_test_mixed = jnp.concatenate((Y_train_obs_0, jnp.array([y])), axis=0)
+                weight_test = self.density_models_0.compute_density_ratio(np.array(np.concatenate((x_test, np.array([y])), axis=0)[None, :]))
+                Y_train_test_mixed = np.concatenate((Y_train_obs_0, np.array([y])), axis=0)
                 self.fit(X_train_test_mixed, Y_train_test_mixed, T=0)
                 Y0_hat = self.models_0.predict(X_train_test_mixed)
-                scores_0 = jnp.abs(Y0_hat - Y_train_test_mixed)
+                scores_0 = np.abs(Y0_hat - Y_train_test_mixed)
                 offset_0 = utils.weighted_transductive_conformal(alpha, weights_train_0, weight_test, scores_0)
                 # print(scores_0[-1], offset_0)
                 if scores_0[-1] < offset_0:
                     y_interval.append(float(y))
-            y_test_0_min = y_test_0_min.at[i].set(min(y_interval))
-            y_test_0_max = y_test_0_max.at[i].set(max(y_interval))
+            y_test_0_min[i] = min(y_interval)
+            y_test_0_max[i] = max(y_interval)
 
         # Predict Y(1)
         X_train_obs_1 = self.X_train_obs[self.T_train_obs==1, :]
@@ -127,8 +125,8 @@ class TCP:
         X_train_inter_1 = self.X_train_inter[self.T_train_inter==1, :]
         Y_train_inter_1 = self.Y_train_inter[self.T_train_inter==1]
 
-        D_train_1 = jnp.concatenate((X_train_obs_1, Y_train_obs_1[:, None]), axis=1)
-        D_inter_1 = jnp.concatenate((X_train_inter_1, Y_train_inter_1[:, None]), axis=1)
+        D_train_1 = np.concatenate((X_train_obs_1, Y_train_obs_1[:, None]), axis=1)
+        D_inter_1 = np.concatenate((X_train_inter_1, Y_train_inter_1[:, None]), axis=1)
 
         self.density_models_1 = densratio(np.array(D_inter_1), np.array(D_train_1))
         weights_train_1 = self.density_models_1.compute_density_ratio(np.array(D_train_1))
@@ -136,24 +134,24 @@ class TCP:
         self.fit(X_train_obs_1, Y_train_obs_1, T=1)
         Y_interval_1_min = self.models_1.predict(X_test) - 3 * Y_train_inter_1.std()
         Y_interval_1_max = self.models_1.predict(X_test) + 3 * Y_train_inter_1.std()
-        Y_interval_1 = jnp.linspace(Y_interval_1_min, Y_interval_1_max, 50).T
-        y_test_1_min, y_test_1_max = jnp.zeros(len(X_test)), jnp.zeros(len(X_test))
+        Y_interval_1 = np.linspace(Y_interval_1_min, Y_interval_1_max, 50).T
+        y_test_1_min, y_test_1_max = np.zeros(len(X_test)), np.zeros(len(X_test))
         
         for i, x_test in enumerate(tqdm(X_test)):
-            X_train_test_mixed = jnp.concatenate((X_train_obs_1, x_test[None, :]), axis=0)
+            X_train_test_mixed = np.concatenate((X_train_obs_1, x_test[None, :]), axis=0)
             y_interval = []
             for y in Y_interval_1[i, :]:
-                weight_test = self.density_models_1.compute_density_ratio(np.array(jnp.concatenate((x_test, jnp.array([y])), axis=0)[None, :]))
-                Y_train_test_mixed = jnp.concatenate((Y_train_obs_1, jnp.array([y])), axis=0)
+                weight_test = self.density_models_1.compute_density_ratio(np.array(np.concatenate((x_test, np.array([y])), axis=0)[None, :]))
+                Y_train_test_mixed = np.concatenate((Y_train_obs_1, np.array([y])), axis=0)
                 self.fit(X_train_test_mixed, Y_train_test_mixed, T=1)
                 Y1_hat = self.models_1.predict(X_train_test_mixed)
-                scores_1 = jnp.abs(Y1_hat - Y_train_test_mixed)
+                scores_1 = np.abs(Y1_hat - Y_train_test_mixed)
                 offset_1 = utils.weighted_transductive_conformal(alpha, weights_train_1, weight_test, scores_1)
                 # print(scores_1[-1], offset_1)
                 if scores_1[-1] < offset_1:
                     y_interval.append(float(y))
-            y_test_1_min = y_test_1_min.at[i].set(min(y_interval))
-            y_test_1_max = y_test_1_max.at[i].set(max(y_interval))
+            y_test_1_min[i] = min(y_interval)
+            y_test_1_max[i] = max(y_interval)
 
         return y_test_0_min, y_test_0_max, y_test_1_min, y_test_1_max
     
