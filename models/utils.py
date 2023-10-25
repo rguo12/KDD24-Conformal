@@ -35,7 +35,7 @@ def split_data(data, n_folds, frac):
         X_calib_list.append(X_calib)
         T_calib_list.append(T_calib)
         Y_calib_list.append(Y_calib)
-    return [train_index_list, X_train_list, T_train_list, Y_train_list], [calib_index_list, X_calib_list, T_calib_list, Y_calib_list]
+    return train_index_list, X_train_list, T_train_list, Y_train_list, calib_index_list, X_calib_list, T_calib_list, Y_calib_list
 
 def weighted_transductive_conformal(alpha, weights_train, weights_test, scores):
     """Weighted transductive conformal prediction
@@ -99,7 +99,7 @@ def weights_and_scores(weight_fn, X_test, X_calib, Y_calib, Y_calib_hat_l, Y_cal
 
 
 def standard_conformal(alpha, scores):
-    q = (1 + len(scores)) * (1 - alpha)
+    q = (1 + 1. / len(scores)) * (1 - alpha)
     q = np.minimum(q, 0.99)
     order = np.argsort(scores)
     scores = scores[order]

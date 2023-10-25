@@ -172,7 +172,7 @@ def transductive_weighted_conformal(df_o, df_i, quantile_regression, n_folds, al
                     base_learner="RF", 
                     quantile_regression=quantile_regression) 
         C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_naive(alpha, X_test, Y0, Y1)
-        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_inexact(alpha, X_test, Y0, Y1)
+        # C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_inexact(alpha, X_test, Y0, Y1)
         coverage_0 = jnp.mean((Y0 >= C0_l) & (Y0 <= C0_u))
         coverage_1 = jnp.mean((Y1 >= C1_l) & (Y1 <= C1_u))
         interval_width_0 = jnp.mean(jnp.abs(C0_u - C0_l))

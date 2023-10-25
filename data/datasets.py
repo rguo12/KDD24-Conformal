@@ -1,4 +1,5 @@
 import numpy as np
+np.random.seed(0)
 from scipy.stats import norm, beta
 from scipy.special import erfinv, expit
 
@@ -203,7 +204,8 @@ def generate_data(n_observation, n_intervention, d, gamma, alpha, confouding):
     
     Y0 = tau_0 + 1 * err_0  
     Y1 = tau + np.sqrt(std) * errdist
-    T = np.random.randint(2, size=(n_intervention, ))
+    ps = 0.5 * np.ones(shape=(n_intervention, ))
+    T = np.random.uniform(size=(n_intervention, )) < ps
     Y = Y0.copy()
     Y[T] = Y1[T]
     
@@ -296,7 +298,7 @@ def generate_cevae_data(n_observation, n_intervention, d:int = 1,
 
     X = X * variance_X + mean_X
     ps = 0.5 * np.ones(shape=(n, ))
-    T = np.random.randint(2, size=(n, ))
+    T = np.random.uniform(size=(n, )) < ps
 
     errY1 = np.random.normal(0., 1. , size=(n, )) * err_scale
     errY0 = np.random.normal(0., 1. , size=(n, )) * err_scale
