@@ -73,7 +73,7 @@ class TCP:
         """
         Fits the plug-in models and meta-learners using the sample (X, W, Y) and true propensity scores pscores
         """
-        if 'nested' in method:
+        if method == 'inexact' or method == 'exact':
             self.models_u_0 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
             self.models_l_0 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_l) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
             self.models_u_1 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
@@ -82,19 +82,11 @@ class TCP:
             self.density_models_0 = [[None for _ in range(self.n_folds)] for _ in range(self.n_folds)]
             self.density_models_1 = [[None for _ in range(self.n_folds)] for _ in range(self.n_folds)]
 
-            # if method == 'nested_inexact':
             self.C0_l_model = RandomForestRegressor()
             self.C0_u_model = RandomForestRegressor()
             self.C1_l_model = RandomForestRegressor()
             self.C1_u_model = RandomForestRegressor()
-            # elif method == 'nested_exact':
-            #     self.C0_l_model = [RandomForestRegressor() for _ in range(self.n_folds)]
-            #     self.C0_u_model = [RandomForestRegressor() for _ in range(self.n_folds)]
-            #     self.C1_l_model = [RandomForestRegressor() for _ in range(self.n_folds)]
-            #     self.C1_u_model = [RandomForestRegressor() for _ in range(self.n_folds)]
-            # else:
-            #     raise ValueError('method must be one of nested_inexact or nested_exact')
-            
+
             # loop over the cross-fitting folds
             for j in range(self.n_folds):
                 X_train_inter_0 = self.X_train_inter_list[j][self.T_train_inter_list[j]==0, :]
@@ -144,7 +136,7 @@ class TCP:
 
     def predict_counterfactual_inexact(self, alpha, X_test, Y0, Y1):
         print("Fitting models ... ")
-        self.fit(method='nested_inexact')
+        self.fit(method='inexact')
         print("Fitting models done. ")
         
         C_calib_u_0, C_calib_l_0 = [], []
@@ -228,7 +220,7 @@ class TCP:
     
     def predict_counterfactual_exact(self, alpha, X_test, Y0, Y1):
         print("Fitting models ... ")
-        self.fit(method='nested_exact')
+        self.fit(method='exact')
         print("Fitting models done. ")
         
         C_calib_u_0, C_calib_l_0 = [], []

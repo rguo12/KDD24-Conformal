@@ -1,5 +1,5 @@
 import numpy as np
-np.random.seed(0)
+# np.random.seed(0)
 from scipy.stats import norm, beta
 from scipy.special import erfinv, expit
 

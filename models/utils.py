@@ -6,6 +6,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.model_selection import train_test_split, StratifiedKFold
 import numpy as np
+import pandas as pd
 
 def split_data(data, n_folds, frac):
     X_train_list, T_train_list, Y_train_list = [], [], []
@@ -52,7 +53,7 @@ def weighted_transductive_conformal(alpha, weights_train, weights_test, scores):
     weights_train_sum = np.sum(weights_train)
     weights_train = weights_train / weights_train_sum
     q = (1 + weights_test / weights_train_sum) * (1 - alpha)
-    q = np.minimum(q, 0.99)
+    q = np.minimum(q, 0.999)
     order = np.argsort(scores)
     scores = scores[order]
     weights = np.concatenate((weights_train, weights_test))
@@ -79,7 +80,7 @@ def weighted_conformal(alpha, weights_calib, weights_test, scores):
     weights_calib_sum = np.sum(weights_calib)
     weights_calib = weights_calib / weights_calib_sum
     q = (1 + weights_test / weights_calib_sum) * (1 - alpha)
-    q = np.minimum(q, 0.99)
+    q = np.minimum(q, 0.999)
     order = np.argsort(scores)
     scores = scores[order]
     weights_calib = weights_calib[order]
@@ -100,8 +101,35 @@ def weights_and_scores(weight_fn, X_test, X_calib, Y_calib, Y_calib_hat_l, Y_cal
 
 def standard_conformal(alpha, scores):
     q = (1 + 1. / len(scores)) * (1 - alpha)
-    q = np.minimum(q, 0.99)
+    q = np.minimum(q, 0.999)
     order = np.argsort(scores)
     scores = scores[order]
     offset = np.quantile(scores, q)
     return offset
+
+
+def save_results(args, res, n_intervention, debug):
+    res['n_intervention'] = n_intervention
+    df = pd.DataFrame.from_dict(res, orient="index").transpose()
+
+    if not os.path.exists(f'{args.save_path}/{args.dataset}_counterfactuals.csv'):
+        df.to_csv(f'{args.save_path}/{args.dataset}_counterfactuals.csv')
+    else:
+        df.to_csv(f'{args.save_path}/{args.dataset}_counterfactuals.csv', mode='a', header=False)
+    
+    if debug:
+        print(f"Weighted conformal prediction ({res['method']})")
+        print("Number of intervention data", n_intervention)
+        print('Coverage of Y(0)', res['coverage_0'])
+        print('Interval width of Y(0)', res['interval_width_0'])
+        print('Coverage of Y(1)', res['coverage_1'])
+        print('Interval width of Y(1)', res['interval_width_1'])
+        print("\n\n" + "=" * 20 + '\n\n')
+    return
+
+
+def preprocess(args):
+    if os.path.exists(f'{args.save_path}/{args.dataset}_counterfactuals.csv'):
+        os.remove(f'{args.save_path}/{args.dataset}_counterfactuals.csv')
+
+    return args
