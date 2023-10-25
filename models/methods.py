@@ -1,6 +1,4 @@
 import numpy as np
-import jax.numpy as jnp
-import jax
 import pandas as pd
 from scipy.stats import norm, beta
 from sklearn.ensemble import RandomForestRegressor
@@ -68,7 +66,6 @@ def conformal_metalearner(df, metalearner="DR", quantile_regression=True, alpha=
     return coverage, average_interval_width, PEHE, conformity_scores
 
 
-
 def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, method):
        
     if len(df_o)==2:
@@ -99,8 +96,8 @@ def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, m
 
         coverage_0 = np.mean((Y0 >= C0[0]) & (Y0 <= C0[1]))
         coverage_1 = np.mean((Y1 >= C1[0]) & (Y1 <= C1[1]))
-        interval_width_0 = jnp.mean(jnp.abs(C0[1] - C0[0]))
-        interval_width_1 = jnp.mean(jnp.abs(C1[1] - C1[0]))
+        interval_width_0 = np.mean(np.abs(C0[1] - C0[0]))
+        interval_width_1 = np.mean(np.abs(C1[1] - C1[0]))
         return coverage_0, coverage_1, interval_width_0, interval_width_1
     
     elif method == 'naive_ITE':
@@ -168,14 +165,16 @@ def transductive_weighted_conformal(df_o, df_i, quantile_regression, n_folds, al
         model = TCP(data_obs=train_data,
                     data_inter=df_i,
                     n_folds=n_folds,
-                    alpha=alpha, 
+                    alpha=alpha / 2, 
                     base_learner="RF", 
                     quantile_regression=quantile_regression) 
-        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_naive(alpha, X_test, Y0, Y1)
+        # C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_naive(alpha, X_test, Y0, Y1)
         # C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_inexact(alpha, X_test, Y0, Y1)
-        coverage_0 = jnp.mean((Y0 >= C0_l) & (Y0 <= C0_u))
-        coverage_1 = jnp.mean((Y1 >= C1_l) & (Y1 <= C1_u))
-        interval_width_0 = jnp.mean(jnp.abs(C0_u - C0_l))
-        interval_width_1 = jnp.mean(jnp.abs(C1_u - C1_l))
+        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_exact(alpha / 2, X_test, Y0, Y1)
+
+        coverage_0 = np.mean((Y0 >= C0_l) & (Y0 <= C0_u))
+        coverage_1 = np.mean((Y1 >= C1_l) & (Y1 <= C1_u))
+        interval_width_0 = np.mean(np.abs(C0_u - C0_l))
+        interval_width_1 = np.mean(np.abs(C1_u - C1_l))
         pause = True
         return coverage_0, coverage_1, interval_width_0, interval_width_1
