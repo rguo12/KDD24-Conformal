@@ -7,6 +7,7 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.model_selection import train_test_split, StratifiedKFold
 import numpy as np
 import pandas as pd
+import time
 
 def split_data(data, n_folds, frac):
     X_train_list, T_train_list, Y_train_list = [], [], []
@@ -112,10 +113,10 @@ def save_results(args, res, n_intervention):
     res['n_intervention'] = n_intervention
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
 
-    if not os.path.exists(f'{args.save_path}/{args.dataset}_counterfactuals.csv'):
-        df.to_csv(f'{args.save_path}/{args.dataset}_counterfactuals.csv')
+    if not os.path.exists(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv'):
+        df.to_csv(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv')
     else:
-        df.to_csv(f'{args.save_path}/{args.dataset}_counterfactuals.csv', mode='a', header=False)
+        df.to_csv(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv', mode='a', header=False)
     
     if args.debug:
         print(f"Weighted conformal prediction ({res['method']})")
@@ -129,7 +130,8 @@ def save_results(args, res, n_intervention):
 
 
 def preprocess(args):
-    if os.path.exists(f'{args.save_path}/{args.dataset}_counterfactuals.csv'):
-        os.remove(f'{args.save_path}/{args.dataset}_counterfactuals.csv')
-
+    if os.path.exists(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv'):
+        os.remove(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv')
+    if args.seed is None:
+        args.seed = int(time.time())
     return args

@@ -1,5 +1,4 @@
 import numpy as np
-# np.random.seed(0)
 from scipy.stats import norm, beta
 from scipy.special import erfinv, expit
 
@@ -255,10 +254,7 @@ def generate_cevae_data(n_observation, n_intervention, d:int = 1,
     mean_X = U
     variance_X = sigma_z0**2*(1-U)+sigma_z1**2*(U)
 
-    # X = np.random.multivariate_normal(0., 1. , key, mean_X, variance_X, size=(n_observation, d))
-    X = np.random.normal(0., 1., size=(n, ))
-
-    X = X * variance_X + mean_X
+    X = np.random.normal(0., 1. , size=(n, )) * variance_X + mean_X
     ps = ps_strength*U+(1-ps_strength)*(1-U)
     T = np.random.uniform(size=(n, )) < ps
 
@@ -291,12 +287,9 @@ def generate_cevae_data(n_observation, n_intervention, d:int = 1,
     # Generate intervention data
     U = np.random.normal(0., 1., size=(n, ))
     mean_X = U
-    variance_X = sigma_z0**2*(1-U)+sigma_z1**2*(U)
+    variance_X = sigma_z0**2*(1-U)+sigma_z1**2*(U) 
 
-    # X = np.random.multivariate_normal(0., 1. , key, mean_X, variance_X, size=(n_observation, d))
-    X = np.random.normal(0., 1. , size=(n, ))
-
-    X = X * variance_X + mean_X
+    X = np.random.normal(0., 1. , size=(n, )) * variance_X + mean_X
     ps = 0.5 * np.ones(shape=(n, ))
     T = np.random.uniform(size=(n, )) < ps
 

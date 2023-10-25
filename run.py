@@ -9,7 +9,7 @@ def get_config():
     parser = argparse.ArgumentParser(description='Transductive Conformal Prediction')
 
     # Data settings
-    parser.add_argument('--seed', type=int, default=32)
+    parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--save_path', type=str, default='./results')
     parser.add_argument('--debug', type=bool, default=True)
     parser.add_argument('--dataset', type=str, default='cevae')
@@ -19,13 +19,14 @@ def get_config():
 
 def main(args):
     args = utils.preprocess(args)
+    np.random.seed(args.seed)
     n_observation = 2000
-    n_intervention_list = [50, 100, 200, 500, 1000]
+    n_intervention_list = np.arange(100, 1000, 100)
     d = 10
 
     alpha = 0.1
     test_frac = 0.5 # n_observation * (1. - test_frac) is the real n_observation
-    n_folds = 2
+    n_folds = 5
 
     # df_train, df_test = generate_lilei_hua_data()
     # _ = weighted_conformal_prediction([df_train, df_test], 
