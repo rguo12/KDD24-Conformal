@@ -146,7 +146,7 @@ def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, m
     return 
 
 
-def transductive_weighted_conformal(df_o, df_i, quantile_regression, alpha, test_frac, method):
+def transductive_weighted_conformal(df_o, df_i, quantile_regression, n_folds, alpha, test_frac, method):
     if len(df_o)==2:
         
         train_data, test_data = df_o
@@ -167,12 +167,12 @@ def transductive_weighted_conformal(df_o, df_i, quantile_regression, alpha, test
     if method == 'counterfactual':
         model = TCP(data_obs=train_data,
                     data_inter=df_i,
+                    n_folds=n_folds,
                     alpha=alpha, 
                     base_learner="RF", 
                     quantile_regression=quantile_regression) 
-        model.conformalize(alpha, method='naive')
-        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactuals(alpha, X_test, Y0, Y1, method='inexact')
-
+        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_naive(alpha, X_test, Y0, Y1)
+        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_inexact(alpha, X_test, Y0, Y1)
         coverage_0 = jnp.mean((Y0 >= C0_l) & (Y0 <= C0_u))
         coverage_1 = jnp.mean((Y1 >= C1_l) & (Y1 <= C1_u))
         interval_width_0 = jnp.mean(jnp.abs(C0_u - C0_l))

@@ -8,24 +8,34 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 import numpy as np
 
 def split_data(data, n_folds, frac):
-    index_1_list, index_2_list = [], []
-    X_1_list, T_1_list, Y_1_list = [], [], []
-    X_2_list, T_2_list, Y_2_list = [], [], []
-    for _ in range(n_folds):
-        index_1 = np.random.permutation(data.index)[:int(frac * len(data.index))]
-        index_2 = np.random.permutation(data.index)[int(frac * len(data.index)):]
-        X_1, X_2 = data.loc[index_1].filter(like = 'X').values, data.loc[index_2].filter(like = 'X').values
-        T_1, T_2 = data.loc[index_1]['T'].values, data.loc[index_2]['T'].values
-        Y_1, Y_2 = data.loc[index_1]['Y'].values, data.loc[index_2]['Y'].values
-        index_1_list.append(index_1)
-        X_1_list.append(X_1)
-        T_1_list.append(T_1)
-        Y_1_list.append(Y_1)
-        index_2_list.append(index_2)
-        X_2_list.append(X_2)
-        T_2_list.append(T_2)
-        Y_2_list.append(Y_2)
-    return [index_1_list, X_1_list, T_1_list, Y_1_list], [index_2_list, X_2_list, T_2_list, Y_2_list]
+    X_train_list, T_train_list, Y_train_list = [], [], []
+    X_calib_list, T_calib_list, Y_calib_list = [], [], []
+
+    X = data.filter(like = 'X').values
+    T = data['T'].values
+    Y = data['Y'].values
+
+    skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
+    train_index_list, calib_index_list = [], []
+    for train_index, calib_index in skf.split(X, T):
+        train_index_list.append(train_index)
+        calib_index_list.append(calib_index)
+
+    for i in range(n_folds):
+        train_index = train_index_list[i]
+        calib_index = calib_index_list[i]
+        X_train, X_calib = X[train_index, :], X[calib_index, :]
+        T_train, T_calib = T[train_index], T[calib_index]
+        Y_train, Y_calib = Y[train_index], Y[calib_index]
+        
+        X_train_list.append(X_train)
+        T_train_list.append(T_train)
+        Y_train_list.append(Y_train)
+        
+        X_calib_list.append(X_calib)
+        T_calib_list.append(T_calib)
+        Y_calib_list.append(Y_calib)
+    return [train_index_list, X_train_list, T_train_list, Y_train_list], [calib_index_list, X_calib_list, T_calib_list, Y_calib_list]
 
 def weighted_transductive_conformal(alpha, weights_train, weights_test, scores):
     """Weighted transductive conformal prediction

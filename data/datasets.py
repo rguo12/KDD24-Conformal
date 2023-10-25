@@ -287,7 +287,7 @@ def generate_cevae_data(n_observation, n_intervention, d:int = 1,
 
     n = n_intervention
     # Generate intervention data
-    U = np.random.uniform(size=(n, )) < ps
+    U = np.random.normal(0., 1., size=(n, ))
     mean_X = U
     variance_X = sigma_z0**2*(1-U)+sigma_z1**2*(U)
 

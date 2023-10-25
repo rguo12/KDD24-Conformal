@@ -23,6 +23,8 @@ def main(args):
     setup = 'A'
     alpha = 0.1
     test_frac = 0.1
+    n_folds = 2
+
     # df_train, df_test = generate_lilei_hua_data()
     # _ = weighted_conformal_prediction([df_train, df_test], 
     #                                   metalearner="DR", 
@@ -45,6 +47,7 @@ def main(args):
                                         df_o,
                                         df_i,
                                         quantile_regression=True,
+                                        n_folds=n_folds,
                                         alpha=alpha,
                                         test_frac=test_frac,
                                         method="counterfactual")
