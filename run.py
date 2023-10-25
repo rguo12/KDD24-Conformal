@@ -57,7 +57,7 @@ def main(args):
                                             test_frac=test_frac,
                                             target="counterfactual",
                                             method = 'naive')
-        utils.save_results(res, n_intervention, args.save_path, args.debug)
+        utils.save_results(args, res, n_intervention)
 
 
         res = transductive_weighted_conformal(
@@ -70,7 +70,7 @@ def main(args):
                                             target="counterfactual",
                                             method = 'inexact')
         
-        utils.save_results(res, n_intervention, args.save_path, args.debug)
+        utils.save_results(args, res, n_intervention)
 
         res = transductive_weighted_conformal(
                                             df_o,
@@ -82,7 +82,7 @@ def main(args):
                                             target="counterfactual",
                                             method = 'exact')
         
-        utils.save_results(res, n_intervention, args.save_path, args.debug)
+        utils.save_results(args, res, n_intervention)
 
 
         res = weighted_conformal_prediction(df_o, 
@@ -93,7 +93,7 @@ def main(args):
                                         method='Li Leihua')
         
         
-        utils.save_results(res, n_intervention, args.save_path, args.debug)
+        utils.save_results(args, res, n_intervention)
 
         # coverage, average_interval_width, PEHE, conformity_scores = conformal_metalearner(df_o, 
         #                                                                                 metalearner="DR", 

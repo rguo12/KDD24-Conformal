@@ -108,7 +108,7 @@ def standard_conformal(alpha, scores):
     return offset
 
 
-def save_results(args, res, n_intervention, debug):
+def save_results(args, res, n_intervention):
     res['n_intervention'] = n_intervention
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
 
@@ -117,7 +117,7 @@ def save_results(args, res, n_intervention, debug):
     else:
         df.to_csv(f'{args.save_path}/{args.dataset}_counterfactuals.csv', mode='a', header=False)
     
-    if debug:
+    if args.debug:
         print(f"Weighted conformal prediction ({res['method']})")
         print("Number of intervention data", n_intervention)
         print('Coverage of Y(0)', res['coverage_0'])
