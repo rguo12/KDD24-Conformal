@@ -20,7 +20,7 @@ def get_config():
 def main(args):
     args = utils.preprocess(args)
     np.random.seed(args.seed)
-    n_observation = 2000
+    n_observation = 10000
     n_intervention_list = np.arange(100, 1000, 100)
     d = 10
 

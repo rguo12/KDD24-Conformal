@@ -73,7 +73,7 @@ class TCP:
         """
         Fits the plug-in models and meta-learners using the sample (X, W, Y) and true propensity scores pscores
         """
-        if method == 'inexact' or method == 'exact':
+        if method == 'two_stage_inexact' or method == 'two_stage_exact':
             self.models_u_0 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
             self.models_l_0 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_l) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
             self.models_u_1 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
@@ -100,15 +100,10 @@ class TCP:
                     X_train_obs_1 = self.X_train_obs_list[i][self.T_train_obs_list[i]==1, :]
                     Y_train_obs_1 = self.Y_train_obs_list[i][self.T_train_obs_list[i]==1]
 
-                    X_train_obs_inter_0 = np.concatenate((X_train_obs_0, X_train_inter_0), axis=0)
-                    Y_train_obs_inter_0 = np.concatenate((Y_train_obs_0, Y_train_inter_0))
-                    X_train_obs_inter_1 = np.concatenate((X_train_obs_1, X_train_inter_1), axis=0)
-                    Y_train_obs_inter_1 = np.concatenate((Y_train_obs_1, Y_train_inter_1))
-
-                    self.models_u_0[j][i].fit(X_train_obs_inter_0, Y_train_obs_inter_0)
-                    self.models_l_0[j][i].fit(X_train_obs_inter_0, Y_train_obs_inter_0)
-                    self.models_u_1[j][i].fit(X_train_obs_inter_1, Y_train_obs_inter_1)
-                    self.models_l_1[j][i].fit(X_train_obs_inter_1, Y_train_obs_inter_1)
+                    self.models_u_0[j][i].fit(X_train_obs_0, Y_train_obs_0)
+                    self.models_l_0[j][i].fit(X_train_obs_0, Y_train_obs_0)
+                    self.models_u_1[j][i].fit(X_train_obs_1, Y_train_obs_1)
+                    self.models_l_1[j][i].fit(X_train_obs_1, Y_train_obs_1)
                     
                     D_train_obs_0 = np.concatenate((X_train_obs_0, Y_train_obs_0[:, None]), axis=1)
                     D_train_inter_0 = np.concatenate((X_train_inter_0, Y_train_inter_0[:, None]), axis=1)
@@ -136,7 +131,7 @@ class TCP:
 
     def predict_counterfactual_inexact(self, alpha, X_test, Y0, Y1):
         print("Fitting models ... ")
-        self.fit(method='inexact')
+        self.fit(method='two_stage_inexact')
         print("Fitting models done. ")
         
         C_calib_u_0, C_calib_l_0 = [], []
@@ -220,7 +215,7 @@ class TCP:
     
     def predict_counterfactual_exact(self, alpha, X_test, Y0, Y1):
         print("Fitting models ... ")
-        self.fit(method='exact')
+        self.fit(method='two_stage_exact')
         print("Fitting models done. ")
         
         C_calib_u_0, C_calib_l_0 = [], []
