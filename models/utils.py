@@ -6,26 +6,38 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.model_selection import train_test_split, StratifiedKFold
 import numpy as np
+import pandas as pd
+import time
 
 def split_data(data, n_folds, frac):
-    index_1_list, index_2_list = [], []
-    X_1_list, T_1_list, Y_1_list = [], [], []
-    X_2_list, T_2_list, Y_2_list = [], [], []
-    for _ in range(n_folds):
-        index_1 = np.random.permutation(data.index)[:int(frac * len(data.index))]
-        index_2 = np.random.permutation(data.index)[int(frac * len(data.index)):]
-        X_1, X_2 = data.loc[index_1].filter(like = 'X').values, data.loc[index_2].filter(like = 'X').values
-        T_1, T_2 = data.loc[index_1]['T'].values, data.loc[index_2]['T'].values
-        Y_1, Y_2 = data.loc[index_1]['Y'].values, data.loc[index_2]['Y'].values
-        index_1_list.append(index_1)
-        X_1_list.append(X_1)
-        T_1_list.append(T_1)
-        Y_1_list.append(Y_1)
-        index_2_list.append(index_2)
-        X_2_list.append(X_2)
-        T_2_list.append(T_2)
-        Y_2_list.append(Y_2)
-    return [index_1_list, X_1_list, T_1_list, Y_1_list], [index_2_list, X_2_list, T_2_list, Y_2_list]
+    X_train_list, T_train_list, Y_train_list = [], [], []
+    X_calib_list, T_calib_list, Y_calib_list = [], [], []
+
+    X = data.filter(like = 'X').values
+    T = data['T'].values
+    Y = data['Y'].values
+
+    skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
+    train_index_list, calib_index_list = [], []
+    for train_index, calib_index in skf.split(X, T):
+        train_index_list.append(train_index)
+        calib_index_list.append(calib_index)
+
+    for i in range(n_folds):
+        train_index = train_index_list[i]
+        calib_index = calib_index_list[i]
+        X_train, X_calib = X[train_index, :], X[calib_index, :]
+        T_train, T_calib = T[train_index], T[calib_index]
+        Y_train, Y_calib = Y[train_index], Y[calib_index]
+        
+        X_train_list.append(X_train)
+        T_train_list.append(T_train)
+        Y_train_list.append(Y_train)
+        
+        X_calib_list.append(X_calib)
+        T_calib_list.append(T_calib)
+        Y_calib_list.append(Y_calib)
+    return train_index_list, X_train_list, T_train_list, Y_train_list, calib_index_list, X_calib_list, T_calib_list, Y_calib_list
 
 def weighted_transductive_conformal(alpha, weights_train, weights_test, scores):
     """Weighted transductive conformal prediction
@@ -42,7 +54,7 @@ def weighted_transductive_conformal(alpha, weights_train, weights_test, scores):
     weights_train_sum = np.sum(weights_train)
     weights_train = weights_train / weights_train_sum
     q = (1 + weights_test / weights_train_sum) * (1 - alpha)
-    q = np.minimum(q, 0.99)
+    q = np.minimum(q, 0.999)
     order = np.argsort(scores)
     scores = scores[order]
     weights = np.concatenate((weights_train, weights_test))
@@ -69,7 +81,7 @@ def weighted_conformal(alpha, weights_calib, weights_test, scores):
     weights_calib_sum = np.sum(weights_calib)
     weights_calib = weights_calib / weights_calib_sum
     q = (1 + weights_test / weights_calib_sum) * (1 - alpha)
-    q = np.minimum(q, 0.99)
+    q = np.minimum(q, 0.999)
     order = np.argsort(scores)
     scores = scores[order]
     weights_calib = weights_calib[order]
@@ -89,9 +101,37 @@ def weights_and_scores(weight_fn, X_test, X_calib, Y_calib, Y_calib_hat_l, Y_cal
 
 
 def standard_conformal(alpha, scores):
-    q = (1 + len(scores)) * (1 - alpha)
-    q = np.minimum(q, 0.99)
+    q = (1 + 1. / len(scores)) * (1 - alpha)
+    q = np.minimum(q, 0.999)
     order = np.argsort(scores)
     scores = scores[order]
     offset = np.quantile(scores, q)
     return offset
+
+
+def save_results(args, res, n_intervention):
+    res['n_intervention'] = n_intervention
+    df = pd.DataFrame.from_dict(res, orient="index").transpose()
+
+    if not os.path.exists(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv'):
+        df.to_csv(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv')
+    else:
+        df.to_csv(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv', mode='a', header=False)
+    
+    if args.debug:
+        print(f"Weighted conformal prediction ({res['method']})")
+        print("Number of intervention data", n_intervention)
+        print('Coverage of Y(0)', res['coverage_0'])
+        print('Interval width of Y(0)', res['interval_width_0'])
+        print('Coverage of Y(1)', res['coverage_1'])
+        print('Interval width of Y(1)', res['interval_width_1'])
+        print("\n\n" + "=" * 20 + '\n\n')
+    return
+
+
+def preprocess(args):
+    if os.path.exists(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv'):
+        os.remove(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv')
+    if args.seed is None:
+        args.seed = int(time.time())
+    return args

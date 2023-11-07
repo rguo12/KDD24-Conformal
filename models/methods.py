@@ -1,6 +1,4 @@
 import numpy as np
-import jax.numpy as jnp
-import jax
 import pandas as pd
 from scipy.stats import norm, beta
 from sklearn.ensemble import RandomForestRegressor
@@ -68,8 +66,7 @@ def conformal_metalearner(df, metalearner="DR", quantile_regression=True, alpha=
     return coverage, average_interval_width, PEHE, conformity_scores
 
 
-
-def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, method):
+def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, target, method):
        
     if len(df_o)==2:
         
@@ -88,7 +85,7 @@ def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, m
     Y0, Y1 = test_data[['Y0']].values.reshape((-1,)), test_data[['Y1']].values.reshape((-1,))
     ITE_test = Y1 - Y0
 
-    if method == 'counterfactual':
+    if target == 'counterfactual':
         model = WCP(data_obs=train_data,
                     alpha=alpha, 
                     base_learner="QRF", 
@@ -99,11 +96,18 @@ def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, m
 
         coverage_0 = np.mean((Y0 >= C0[0]) & (Y0 <= C0[1]))
         coverage_1 = np.mean((Y1 >= C1[0]) & (Y1 <= C1[1]))
-        interval_width_0 = jnp.mean(jnp.abs(C0[1] - C0[0]))
-        interval_width_1 = jnp.mean(jnp.abs(C1[1] - C1[0]))
-        return coverage_0, coverage_1, interval_width_0, interval_width_1
+        interval_width_0 = np.mean(np.abs(C0[1] - C0[0]))
+        interval_width_1 = np.mean(np.abs(C1[1] - C1[0]))
+        
+        res = {}
+        res['method'] = method
+        res['coverage_0'] = coverage_0
+        res['coverage_1'] = coverage_1
+        res['interval_width_0'] = interval_width_0
+        res['interval_width_1'] = interval_width_1
+        return res
     
-    elif method == 'naive_ITE':
+    elif target == 'naive_ITE':
         model = WCP(train_data=train_data,
                     alpha=alpha, 
                     base_learner="QRF", 
@@ -117,7 +121,7 @@ def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, m
         print('Coverage of ITE (naive)', coverage_ITE)
         print('Interval width of ITE (naive)', interval_width_ITE)
 
-    elif method == 'nested_inexact':
+    elif target == 'nested_inexact':
         model = WCP(train_data=train_data,
                     alpha=alpha, 
                     base_learner="QRF", 
@@ -130,7 +134,7 @@ def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, m
         print('Coverage of ITE (nested inexact)', coverage_ITE)
         print('Interval width of ITE (nested inexact)', interval_width_ITE)
 
-    elif method == 'nested_exact':
+    elif target == 'nested_exact':
         model = WCP(train_data=train_data,
                     alpha=alpha / 2, 
                     base_learner="QRF", 
@@ -146,7 +150,7 @@ def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, m
     return 
 
 
-def transductive_weighted_conformal(df_o, df_i, quantile_regression, alpha, test_frac, method):
+def transductive_weighted_conformal(df_o, df_i, quantile_regression, n_folds, alpha, test_frac, target, method):
     if len(df_o)==2:
         
         train_data, test_data = df_o
@@ -164,18 +168,52 @@ def transductive_weighted_conformal(df_o, df_i, quantile_regression, alpha, test
     Y0, Y1 = test_data[['Y0']].values.reshape((-1,)), test_data[['Y1']].values.reshape((-1,))
     ITE_test = Y1 - Y0
 
-    if method == 'counterfactual':
-        model = TCP(data_obs=train_data,
-                    data_inter=df_i,
-                    alpha=alpha, 
-                    base_learner="RF", 
-                    quantile_regression=quantile_regression) 
-        model.conformalize(alpha, method='naive')
-        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactuals(alpha, X_test, Y0, Y1, method='inexact')
+    if target == 'counterfactual':
+        if method == 'naive':
+            model = TCP(data_obs=train_data,
+                        data_inter=df_i,
+                        n_folds=n_folds,
+                        alpha=alpha, 
+                        base_learner="RF", 
+                        quantile_regression=quantile_regression) 
+            
+            C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_naive(alpha, X_test, Y0, Y1)
+            coverage_0 = np.mean((Y0 >= C0_l) & (Y0 <= C0_u))
+            coverage_1 = np.mean((Y1 >= C1_l) & (Y1 <= C1_u))
+            interval_width_0 = np.mean(np.abs(C0_u - C0_l))
+            interval_width_1 = np.mean(np.abs(C1_u - C1_l))
 
-        coverage_0 = jnp.mean((Y0 >= C0_l) & (Y0 <= C0_u))
-        coverage_1 = jnp.mean((Y1 >= C1_l) & (Y1 <= C1_u))
-        interval_width_0 = jnp.mean(jnp.abs(C0_u - C0_l))
-        interval_width_1 = jnp.mean(jnp.abs(C1_u - C1_l))
-        pause = True
-        return coverage_0, coverage_1, interval_width_0, interval_width_1
+        elif method == 'inexact':
+            model = TCP(data_obs=train_data,
+                        data_inter=df_i,
+                        n_folds=n_folds,
+                        alpha=alpha, 
+                        base_learner="RF", 
+                        quantile_regression=quantile_regression) 
+            
+            C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_inexact(alpha, X_test, Y0, Y1)
+            coverage_0 = np.mean((Y0 >= C0_l) & (Y0 <= C0_u))
+            coverage_1 = np.mean((Y1 >= C1_l) & (Y1 <= C1_u))
+            interval_width_0 = np.mean(np.abs(C0_u - C0_l))
+            interval_width_1 = np.mean(np.abs(C1_u - C1_l))
+        
+        elif method == 'exact':
+            model = TCP(data_obs=train_data,
+                data_inter=df_i,
+                n_folds=n_folds,
+                alpha=alpha / 2, 
+                base_learner="RF", 
+                quantile_regression=quantile_regression) 
+            C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_exact(alpha / 2, X_test, Y0, Y1)
+            coverage_0 = np.mean((Y0 >= C0_l) & (Y0 <= C0_u))
+            coverage_1 = np.mean((Y1 >= C1_l) & (Y1 <= C1_u))
+            interval_width_0 = np.mean(np.abs(C0_u - C0_l))
+            interval_width_1 = np.mean(np.abs(C1_u - C1_l))
+
+        res = {}
+        res['method'] = method
+        res['coverage_0'] = coverage_0
+        res['coverage_1'] = coverage_1
+        res['interval_width_0'] = interval_width_0
+        res['interval_width_1'] = interval_width_1
+        return res
