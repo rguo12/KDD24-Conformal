@@ -203,7 +203,8 @@ def generate_data(n_observation, n_intervention, d, gamma, alpha, confouding):
     
     Y0 = tau_0 + 1 * err_0  
     Y1 = tau + np.sqrt(std) * errdist
-    T = np.random.randint(2, size=(n_intervention, ))
+    ps = 0.5 * np.ones(shape=(n_intervention, ))
+    T = np.random.uniform(size=(n_intervention, )) < ps
     Y = Y0.copy()
     Y[T] = Y1[T]
     
@@ -253,10 +254,7 @@ def generate_cevae_data(n_observation, n_intervention, d:int = 1,
     mean_X = U
     variance_X = sigma_z0**2*(1-U)+sigma_z1**2*(U)
 
-    # X = np.random.multivariate_normal(0., 1. , key, mean_X, variance_X, size=(n_observation, d))
-    X = np.random.normal(0., 1., size=(n, ))
-
-    X = X * variance_X + mean_X
+    X = np.random.normal(0., 1. , size=(n, )) * variance_X + mean_X
     ps = ps_strength*U+(1-ps_strength)*(1-U)
     T = np.random.uniform(size=(n, )) < ps
 
@@ -287,16 +285,13 @@ def generate_cevae_data(n_observation, n_intervention, d:int = 1,
 
     n = n_intervention
     # Generate intervention data
-    U = np.random.uniform(size=(n, )) < ps
+    U = np.random.normal(0., 1., size=(n, ))
     mean_X = U
-    variance_X = sigma_z0**2*(1-U)+sigma_z1**2*(U)
+    variance_X = sigma_z0**2*(1-U)+sigma_z1**2*(U) 
 
-    # X = np.random.multivariate_normal(0., 1. , key, mean_X, variance_X, size=(n_observation, d))
-    X = np.random.normal(0., 1. , size=(n, ))
-
-    X = X * variance_X + mean_X
+    X = np.random.normal(0., 1. , size=(n, )) * variance_X + mean_X
     ps = 0.5 * np.ones(shape=(n, ))
-    T = np.random.randint(2, size=(n, ))
+    T = np.random.uniform(size=(n, )) < ps
 
     errY1 = np.random.normal(0., 1. , size=(n, )) * err_scale
     errY0 = np.random.normal(0., 1. , size=(n, )) * err_scale
