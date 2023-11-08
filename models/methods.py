@@ -66,7 +66,20 @@ def conformal_metalearner(df, metalearner="DR", quantile_regression=True, alpha=
     return coverage, average_interval_width, PEHE, conformity_scores
 
 
-def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, target, method):
+def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, target, method : str):
+    """_summary_
+
+    Args:
+        df_o (_type_): _description_
+        quantile_regression (_type_): _description_
+        alpha (_type_): _description_
+        test_frac (_type_): _description_
+        target (_type_): _description_
+        method (str): only used as name for the row in saved results
+
+    Returns:
+        _type_: _description_
+    """
        
     if len(df_o)==2:
         
@@ -150,7 +163,26 @@ def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, t
     return 
 
 
-def transductive_weighted_conformal(df_o, df_i, quantile_regression, n_folds, alpha, test_frac, target, method):
+def run_conformal(df_o, df_i, 
+                  quantile_regression, 
+                  n_folds : int, alpha : float, test_frac : float, target : str, method : str):
+    """_summary_
+    Run naive CP on intervention, and our exact and inexact methods
+
+    Args:
+        df_o (_type_): observational data
+        df_i (_type_): interventional data
+        quantile_regression (_type_): _description_
+        n_folds (_type_): _description_
+        alpha (_type_): _description_
+        test_frac (_type_): _description_
+        target (_type_): select from counterfactual
+        method (_type_): select from naive, inexact and exact
+
+    Returns:
+        _type_: _description_
+    """
+
     if len(df_o)==2:
         
         train_data, test_data = df_o
@@ -170,7 +202,7 @@ def transductive_weighted_conformal(df_o, df_i, quantile_regression, n_folds, al
 
     if target == 'counterfactual':
         if method == 'naive':
-            model = TCP(data_obs=train_data,
+            model = SplitCP(data_obs=train_data,
                         data_inter=df_i,
                         n_folds=n_folds,
                         alpha=alpha, 
@@ -184,7 +216,7 @@ def transductive_weighted_conformal(df_o, df_i, quantile_regression, n_folds, al
             interval_width_1 = np.mean(np.abs(C1_u - C1_l))
 
         elif method == 'inexact':
-            model = TCP(data_obs=train_data,
+            model = SplitCP(data_obs=train_data,
                         data_inter=df_i,
                         n_folds=n_folds,
                         alpha=alpha, 
@@ -198,13 +230,29 @@ def transductive_weighted_conformal(df_o, df_i, quantile_regression, n_folds, al
             interval_width_1 = np.mean(np.abs(C1_u - C1_l))
         
         elif method == 'exact':
-            model = TCP(data_obs=train_data,
+            model = SplitCP(data_obs=train_data,
                 data_inter=df_i,
                 n_folds=n_folds,
                 alpha=alpha / 2, 
                 base_learner="RF", 
                 quantile_regression=quantile_regression) 
             C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_exact(alpha / 2, X_test, Y0, Y1)
+            coverage_0 = np.mean((Y0 >= C0_l) & (Y0 <= C0_u))
+            coverage_1 = np.mean((Y1 >= C1_l) & (Y1 <= C1_u))
+            interval_width_0 = np.mean(np.abs(C0_u - C0_l))
+            interval_width_1 = np.mean(np.abs(C1_u - C1_l))
+        
+        elif method == 'TCP':
+            model = TCP(data_obs=train_data,
+                data_inter=df_i,
+                n_folds=n_folds,
+                alpha=alpha / 2, 
+                base_learner="GBM", 
+                quantile_regression=False)
+            
+            # alpha
+            C0_l, C0_u = model.predict_counterfactual(X_test, T=0)
+            C1_l, C1_u = model.predict_counterfactual(X_test, T=1)
             coverage_0 = np.mean((Y0 >= C0_l) & (Y0 <= C0_u))
             coverage_1 = np.mean((Y1 >= C1_l) & (Y1 <= C1_u))
             interval_width_0 = np.mean(np.abs(C0_u - C0_l))
@@ -217,3 +265,4 @@ def transductive_weighted_conformal(df_o, df_i, quantile_regression, n_folds, al
         res['interval_width_0'] = interval_width_0
         res['interval_width_1'] = interval_width_1
         return res
+    
