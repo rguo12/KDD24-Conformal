@@ -2,8 +2,8 @@
 import argparse 
 
 from data.datasets import *
-from models.methods import *
-
+from models.methods import run_conformal, weighted_conformal_prediction
+from models import utils
 
 def get_config():
     parser = argparse.ArgumentParser(description='Transductive Conformal Prediction')
@@ -27,6 +27,7 @@ def main(args):
     alpha = 0.1
     test_frac = 0.5 # n_observation * (1. - test_frac) is the real n_observation
     n_folds = 5
+    err_scale = 0.1
 
     # df_train, df_test = generate_lilei_hua_data()
     # _ = weighted_conformal_prediction([df_train, df_test], 
@@ -46,42 +47,42 @@ def main(args):
                                 alpha=alpha,
                                 confouding=True)
         elif args.dataset == 'cevae':
-            df_o, df_i = generate_cevae_data(n_observation, n_intervention)
+            df_o, df_i = generate_cevae_data(n_observation, n_intervention, err_scale = err_scale)
         
         
-        res = transductive_weighted_conformal(
-                                            df_o,
-                                            df_i,
-                                            quantile_regression=True,
-                                            n_folds=n_folds,
-                                            alpha=alpha,
-                                            test_frac=test_frac,
-                                            target="counterfactual",
-                                            method = 'naive')
+        res = run_conformal(
+                            df_o,
+                            df_i,
+                            quantile_regression=True,
+                            n_folds=n_folds,
+                            alpha=alpha,
+                            test_frac=test_frac,
+                            target="counterfactual",
+                            method = 'naive')
         utils.save_results(args, res, n_intervention)
 
 
-        res = transductive_weighted_conformal(
-                                            df_o,
-                                            df_i,
-                                            quantile_regression=True,
-                                            n_folds=n_folds,
-                                            alpha=alpha,
-                                            test_frac=test_frac,
-                                            target="counterfactual",
-                                            method = 'inexact')
+        res = run_conformal(
+                            df_o,
+                            df_i,
+                            quantile_regression=True,
+                            n_folds=n_folds,
+                            alpha=alpha,
+                            test_frac=test_frac,
+                            target="counterfactual",
+                            method = 'inexact')
         
         utils.save_results(args, res, n_intervention)
 
-        res = transductive_weighted_conformal(
-                                            df_o,
-                                            df_i,
-                                            quantile_regression=True,
-                                            n_folds=n_folds,
-                                            alpha=alpha,
-                                            test_frac=test_frac,
-                                            target="counterfactual",
-                                            method = 'exact')
+        res = run_conformal(
+                            df_o,
+                            df_i,
+                            quantile_regression=True,
+                            n_folds=n_folds,
+                            alpha=alpha,
+                            test_frac=test_frac,
+                            target="counterfactual",
+                            method = 'exact')
         
         utils.save_results(args, res, n_intervention)
 
@@ -91,8 +92,20 @@ def main(args):
                                         alpha=alpha, 
                                         test_frac=test_frac,
                                         target="counterfactual",
-                                        method='Li Leihua')
+                                        method='weighted CP')
         
+        
+        utils.save_results(args, res, n_intervention)
+
+        res = run_conformal(
+                            df_o,
+                            df_i,
+                            quantile_regression=False, # QR not implemented yet
+                            n_folds=n_folds,
+                            alpha=alpha,
+                            test_frac=test_frac,
+                            target="counterfactual",
+                            method = 'TCP')
         
         utils.save_results(args, res, n_intervention)
 
