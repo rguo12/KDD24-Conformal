@@ -405,7 +405,7 @@ class SplitCP(BaseCP):
 
 class TCP(BaseCP):
     def __init__(self, data_obs, data_inter, n_folds,
-                 alpha=0.1, base_learner="GBM", quantile_regression=False, K:int = 10):
+                 alpha=0.1, base_learner:str="GBM", quantile_regression:bool=False, K:int = 10):
 
         """
         Transductive conformal prediction, our method for Theorem 1
