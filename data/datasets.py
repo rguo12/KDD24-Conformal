@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.stats import norm, beta
 from scipy.special import erfinv, expit
+import requests
+import pyreadr
 
 import pandas as pd
 import os
@@ -14,6 +16,26 @@ PATH_dir = "./data/NLSM/data"
 from pathlib import Path
 from typing import Any, Tuple
 
+from sklearn.linear_model import LogisticRegression
+from sklearn import preprocessing, model_selection
+
+
+def assemble_data(X, T, Y1, Y0, d, ps, mu0=None, mu1=None):
+    Y = Y0.copy()
+    Y[T] = Y1[T]
+    data = np.column_stack((X, T, Y))
+    column_names = [f'X{i}' for i in range(1, d+1)] + ['T', 'Y']
+    df = pd.DataFrame(data, columns=column_names)
+    df["ps"] = np.array(ps).reshape((-1,))
+    df["Y1"] = Y1.reshape((-1,))
+    df["Y0"] = Y0.reshape((-1,))
+    df["CATE"] = Y1 - Y0
+
+    if mu0 is not None and mu1 is not None:
+        df["mu0"] = mu0 # Y0 w/o noise
+        df["mu1"] = mu1
+
+    return df
 
 
 def convert(npz_file, scale=None):
@@ -75,7 +97,6 @@ def convert(npz_file, scale=None):
                 df["CATE"] = mu1_ - mu0_ 
           
             else:
-
                 scales.append(1)
 
         elif scale is not None:
@@ -220,107 +241,198 @@ def generate_data(n_observation, n_intervention, d, gamma, alpha, confouding):
     return df_observation, df_intervention
 
 
-def generate_cevae_data(n_observation, n_intervention, d:int = 1, 
-                        err_scale: float = 0.1, ps_strength:float = 0.6):
-    
-    # def correlated_covariates(n, d):
-    #     rho = 0.9
-    #     _ = np.random.split(rng_key)
-    #     X = np.random.normal(0., 1. , size=(n, d))
-    #     fac = np.random.normal(0., 1. , size=(n, d))
-    #     X = X * np.sqrt(1 - rho) + fac * np.sqrt(rho)
-    #     return norm.cdf(X)
 
-    # U \sim Bern(0.5)
-    # X \sim N(U,sigma_z0**2*(1-U)+sigma_z1**2*(U))
-    # T \sim Bern(0.75*U+0.25*(1-U))
-    # Y \sim Sigmoid(3*(U+(2T-1)))
+
+def IHDP_w_HC(n_intervention, seed, d=1,
+              hidden_confounding=True, beta_u=None, root="data/IHDP"):
+    # adapted from https://github.com/anndvision/quince/blob/main/quince/library/datasets/ihdp.py
+
+    """
+    IHDP with Hidden Confounding
+
+    Args:
+        root (_type_): _description_
+        split (_type_): _description_
+        mode (_type_): _description_
+        seed (_type_): _description_
+        hidden_confounding (_type_): _description_
+        beta_u (_type_, optional): _description_. Defaults to None.
+
+    Raises:
+        NotImplementedError: _description_
+        NotImplementedError: _description_
+        NotImplementedError: _description_
+    """
+    _CONTINUOUS_COVARIATES = [
+        "bw",
+        "b.head",
+        "preterm",
+        "birth.o",
+        "nnhealth",
+        "momage",
+    ]
+
+    _BINARY_COVARIATES = [
+        "sex",
+        "twin",
+        "mom.lths",
+        "mom.hs",
+        "mom.scoll",
+        "cig",
+        "first",
+        "booze",
+        "drugs",
+        "work.dur",
+        "prenatal",
+        "ark",
+        "ein",
+        "har",
+        "mia",
+        "pen",
+        "tex",
+        "was",
+    ]
+
+    _HIDDEN_COVARIATE = [
+        "b.marr",
+    ]
+
+    root = Path.home() / "quince_datasets" if root is None else Path(root)
+    data_path = root / "ihdp.RData"
+    # Download data if necessary
+    if not data_path.exists():
+        root.mkdir(parents=True, exist_ok=True)
+        r = requests.get(
+            "https://github.com/vdorie/npci/raw/master/examples/ihdp_sim/data/ihdp.RData"
+        )
+        with open(data_path, "wb") as f:
+            f.write(r.content)
+    df = pyreadr.read_r(data_path)["ihdp"]
+    # Make observational as per Hill 2011
+    df = df[~((df["treat"] == 1) & (df["momwhite"] == 0))]
+    df = df[
+        _CONTINUOUS_COVARIATES + _BINARY_COVARIATES + _HIDDEN_COVARIATE + ["treat"]
+    ]
+    # Standardize continuous covariates
+    df[_CONTINUOUS_COVARIATES] = preprocessing.StandardScaler().fit_transform(
+        df[_CONTINUOUS_COVARIATES]
+    )
+    
+    # Generate response surfaces
+    rng = np.random.default_rng(seed)
+    x = df[_CONTINUOUS_COVARIATES + _BINARY_COVARIATES]
+    u = df[_HIDDEN_COVARIATE]
+    t = df["treat"]
+
+    beta_x = rng.choice(
+        [0.0, 0.1, 0.2, 0.3, 0.4], size=(24,), p=[0.6, 0.1, 0.1, 0.1, 0.1]
+    )
+    beta_u = (
+        rng.choice(
+            [0.1, 0.2, 0.3, 0.4, 0.5], size=(1,), p=[0.2, 0.2, 0.2, 0.2, 0.2]
+        )
+        if beta_u is None
+        else np.asarray([beta_u])
+    )
+
+    mu0 = np.exp((x + 0.5).dot(beta_x) + (u + 0.5).dot(beta_u))
+    df["mu0"] = mu0
+    mu1 = (x + 0.5).dot(beta_x) + (u + 0.5).dot(beta_u)
+    omega = (mu1[t == 1] - mu0[t == 1]).mean(0) - 4
+    mu1 -= omega
+    df["mu1"] = mu1
+    eps = rng.normal(size=t.shape)
+    y0 = mu0 + eps
+    df["y0"] = y0
+    y1 = mu1 + eps
+    df["y1"] = y1
+    y = t * y1 + (1 - t) * y0
+    df["y"] = y
+
+    n = len(y)
+
+    # obs int split
+    df_obs_raw, df_int_raw = model_selection.train_test_split(
+        df, test_size=float(n_intervention)/n, random_state=seed
+    )
+
+    covars = _CONTINUOUS_COVARIATES + _BINARY_COVARIATES
+    covars = covars + _HIDDEN_COVARIATE if not hidden_confounding else covars
+    
+    U_obs = df_obs_raw[_HIDDEN_COVARIATE].to_numpy(dtype="float32")
+    X_obs = df_obs_raw[covars].to_numpy(dtype="float32")
+    T_obs = df_obs_raw["treat"].to_numpy(dtype="int")
+    mu0_obs = df_obs_raw["mu0"].to_numpy(dtype="float32")
+    mu1_obs = df_obs_raw["mu1"].to_numpy(dtype="float32")
+    Y0_obs = df_obs_raw["y0"].to_numpy(dtype="float32")
+    Y1_obs = df_obs_raw["y1"].to_numpy(dtype="float32")
+
+    model = LogisticRegression()
+    model.fit(X_obs, T_obs)
+    ps_obs = model.predict_proba(X_obs)[:, 1]
+
+    df_obs = assemble_data(X_obs, T_obs, Y1_obs, Y0_obs, d, ps_obs, mu1=mu1_obs, mu0=mu0_obs)
+
+    U_int = df_int_raw[_HIDDEN_COVARIATE].to_numpy(dtype="float32")
+    X_int = df_int_raw[covars].to_numpy(dtype="float32")
+    # override the true treatment?
+    ps_int = 0.5 * np.ones_like(U_int)
+    T_int = (np.random.uniform(size=U_int.shape) < ps_int).astype("int") #df_obs_raw["treat"].to_numpy(dtype="float32")
+    mu0_int = df_int_raw["mu0"].to_numpy(dtype="float32")
+    mu1_int = df_int_raw["mu1"].to_numpy(dtype="float32")
+    Y0_int = df_int_raw["y0"].to_numpy(dtype="float32")
+    Y1_int = df_int_raw["y1"].to_numpy(dtype="float32")
+
+    df_int = assemble_data(X_int, T_int, Y1_int, Y0_int, d, ps_int, mu1=mu1_int, mu0=mu0_int)
+
+    return df_obs, df_int
+
+
+def generate_cevae_data(n_observation, n_intervention, d=1, err_scale=0.1, ps_strength=0.6):
+
+    def generate_confounder(n):
+        return np.random.normal(0., 1., size=(n, ))
+
+    def generate_covariate(U, sigma_z0=5.0, sigma_z1=3.0):
+        variance_X = sigma_z0**2*(1-U) + sigma_z1**2*U
+        mean_X = U
+        return np.random.normal(0., 1., size=U.shape) * variance_X + mean_X
+
+    def generate_treatment(U, ps_strength=0.6, intervention=False):
+
+        ps = ps_strength*U + (1-ps_strength)*(1-U)
+
+        if intervention:
+            return np.random.uniform(size=U.shape) < 0.5 * np.ones_like(U), ps
+        else:
+            return np.random.uniform(size=U.shape) < ps, ps
+
+    def generate_outcomes(U, n, err_scale=0.1):
+        errY1 = np.random.normal(0., 1., size=(n, )) * err_scale
+        errY0 = np.random.normal(0., 1., size=(n, )) * err_scale
+        tau1 = expit(3.0*(U+2))
+        tau0 = expit(3.0*(U-2))
+        Y1 = tau1 + errY1
+        Y0 = tau0 + errY0
+        return Y1, Y0
     
     # Generate observation data
-    # _ = np.random.split(rng_key)
-    
-    # generate data
+    U_obs = generate_confounder(n_observation)
+    X_obs = generate_covariate(U_obs)
+    T_obs, ps_obs = generate_treatment(U_obs, ps_strength)
+    Y1_obs, Y0_obs = generate_outcomes(U_obs, n_observation, err_scale)
+    df_observation = assemble_data(X_obs, T_obs, Y1_obs, Y0_obs, d, ps_obs)
 
-    # d-dimensional bern random variable U as hidden confounders
-    # U = np.abs(np.random.normal(0., 1. , size=(n_observation, d)))
-
-    sigma_z1 = 3.0
-    sigma_z0 = 5.0
-
-    n = n_observation
-
-    U = np.random.normal(0., 1., size=(n, ))
-    # U = np.random.bernoulli(key, p=0.5, size=(n, 1))
-    mean_X = U
-    variance_X = sigma_z0**2*(1-U)+sigma_z1**2*(U)
-
-    X = np.random.normal(0., 1. , size=(n, )) * variance_X + mean_X
-    ps = ps_strength*U+(1-ps_strength)*(1-U)
-    T = np.random.uniform(size=(n, )) < ps
-
-    errY1 = np.random.normal(0., 1. , size=(n_observation, )) * err_scale
-    errY0 = np.random.normal(0., 1. , size=(n_observation, )) * err_scale
-
-    tau1 = expit(3.0*(U+2))
-    tau0 = expit(3.0*(U-2))
-
-    Y1 = tau1 + errY1
-    Y0 = tau0 + errY0
-    # Y1 = 3.0*(U+2)
-    # Y0 = 3.0*(U-2)
-    # Y1 = np.random.bernoulli(p=jax.nn.sigmoid(3.0*(U+2)), size=(n,1)).astype('float16')
-    # Y0 = np.random.bernoulli(p=jax.nn.sigmoid(3.0*(U-2)), size=(n,1)).astype('float16')
-
-    Y = Y0.copy()
-    Y[T] = Y1[T]
-    
-    data_observation = np.column_stack((X, T, Y))
-    column_names = [f'X{i}' for i in range(1, d+1)] + ['T', 'Y']
-    df_observation = pd.DataFrame(data_observation, columns=column_names)
-    df_observation["ps"] = np.array(ps).reshape((-1,))
-    df_observation["Y1"] = Y1.reshape((-1,))
-    df_observation["Y0"] = Y0.reshape((-1,))
-    df_observation["CATE"] = Y1 - Y0
-    # df_observation["width"] = np.mean(np.sqrt(2)*(np.sqrt(2)*std) * erfinv(2*(1-(alpha/2))-1) * 2) 
-
-    n = n_intervention
     # Generate intervention data
-    U = np.random.normal(0., 1., size=(n, ))
-    mean_X = U
-    variance_X = sigma_z0**2*(1-U)+sigma_z1**2*(U) 
-
-    X = np.random.normal(0., 1. , size=(n, )) * variance_X + mean_X
-    ps = 0.5 * np.ones(shape=(n, ))
-    T = np.random.uniform(size=(n, )) < ps
-
-    errY1 = np.random.normal(0., 1. , size=(n, )) * err_scale
-    errY0 = np.random.normal(0., 1. , size=(n, )) * err_scale
-
-    # Y1 = np.random.bernoulli(p=jax.nn.sigmoid(3.0*(U+2)), size=(n,1)).astype('float16')
-    # Y0 = np.random.bernoulli(p=jax.nn.sigmoid(3.0*(U-2)), size=(n,1)).astype('float16')
-
-    tau1 = expit(3.0*(U+2))
-    tau0 = expit(3.0*(U-2))
-
-    Y1 = tau1 + errY1
-    Y0 = tau0 + errY0
-
-    # Y1 = 3.0*(U+2)
-    # Y0 = 3.0*(U-2)
-
-    Y = Y0.copy()
-    Y[T] = Y1[T]
-    
-    data_intervention = np.column_stack((X, T, Y))
-    column_names = [f'X{i}' for i in range(1, d+1)] + ['T', 'Y']
-    df_intervention = pd.DataFrame(data_intervention, columns=column_names)
-    df_intervention["ps"] = np.array(ps).reshape((-1,))
-    df_intervention["Y1"] = Y1.reshape((-1,))
-    df_intervention["Y0"] = Y0.reshape((-1,))
-    df_intervention["CATE"] = Y1 - Y0
-    # df_intervention["width"] = np.mean(np.sqrt(2)*(np.sqrt(2)*std)*erfinv(2*(1-(alpha/2))-1) * 2) 
+    U_int = generate_confounder(n_intervention)
+    X_int = generate_covariate(U_int)
+    T_int, ps_int = generate_treatment(U_int, ps_strength, intervention=True) #ps is the true ps, just for recording, not 0.5
+    Y1_int, Y0_int = generate_outcomes(U_int, n_intervention, err_scale)
+    df_intervention = assemble_data(X_int, T_int, Y1_int, Y0_int, d, ps_int)
 
     return df_observation, df_intervention
+
+
 
 
 def generate_lilei_hua_data():

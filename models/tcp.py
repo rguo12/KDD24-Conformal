@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, GradientBoostingClassifier
+from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from quantile_forest import RandomForestQuantileRegressor
 # import density_ratio_estimation.src.densityratio as densityratio
@@ -405,7 +406,8 @@ class SplitCP(BaseCP):
 
 class TCP(BaseCP):
     def __init__(self, data_obs, data_inter, n_folds,
-                 alpha=0.1, base_learner:str="GBM", quantile_regression:bool=False, K:int = 10):
+                 alpha=0.1, base_learner:str="GBM", quantile_regression:bool=False, K:int = 10,
+                 density_ratio_model="MLP", seed=1):
 
         """
         Transductive conformal prediction, our method for Theorem 1
@@ -418,12 +420,15 @@ class TCP(BaseCP):
                                         or a point estimate of the CATE function. 
 
             :param K: number of bins for discretized Y
+            :param DR_model: "DR" (traditional density ratio estimator) or "MLP" (MLP classifier classifying obs and int)
+
         """
         super().__init__(data_obs, data_inter, n_folds, alpha, base_learner, quantile_regression)
         self.K = K
         self.models = {}
         self.density_models = {}
-    
+        self.density_ratio_model = density_ratio_model
+        self.seed = seed
     # def fit(self, X, y, T, model):
     #     """
     #     Fits the plug-in models and meta-learners using the sample (X, W, Y) and true propensity scores pscores
@@ -493,16 +498,36 @@ class TCP(BaseCP):
         D_obs = np.concatenate((X_train_obs, Y_train_obs_dis[:, None]), axis=1)
         D_inter = np.concatenate((X_train_inter, Y_train_inter_dis[:, None]), axis=1)
 
-        density_model = densratio(D_inter, D_obs, alpha=0.01)
-        self.density_models[T] = density_model # save density ratio model
+        if self.density_ratio_model == "DR":
+            density_model = densratio(D_inter, D_obs, alpha=0.01)
+            self.density_models[T] = density_model # save density ratio model
+            weights_train = density_model.compute_density_ratio(D_obs)
 
-        weights_train = density_model.compute_density_ratio(D_obs)
+        elif self.density_ratio_model == "MLP":
+            density_model = MLPClassifier(random_state=self.seed, max_iter=100)
+
+            # Assigning labels
+            Y_obs_mlp = np.ones(len(D_obs))  # Label 1 for observed class
+            Y_inter_mlp = np.zeros(len(D_inter))  # Label 0 for interventional class
+
+            # Merging the datasets
+            X_mlp = np.concatenate((D_obs, D_inter))
+            Y_mlp = np.concatenate((Y_obs_mlp, Y_inter_mlp))
+
+            density_model.fit(X_mlp, Y_mlp)
+            
+            self.density_models[T] = density_model
+
+            p_obs = density_model.predict_proba(D_obs)[:,1]
+
+            weights_train = (1-p_obs)/p_obs #TODO: double check
 
         # save results
         y_test_min = np.zeros(n_test_inter)
         y_test_max = np.zeros(n_test_inter)
 
         update_interval = 50 # for tqdm
+
         with tqdm(total=X_test.shape[0]) as pbar:
 
             for test_idx in range(X_test.shape[0]):
@@ -511,8 +536,15 @@ class TCP(BaseCP):
                 y_interval = []
 
                 for k, y_hat in enumerate(Y_bins):
-                    weight_test = self.density_models[T].compute_density_ratio(
-                        np.array(np.concatenate((x_test, np.array([y_hat])), axis=0)[None, :]))
+                    D_test = np.array(np.concatenate((x_test, np.array([y_hat])), axis=0)[None, :])
+                    if self.density_ratio_model == "DR":
+                        weight_test = self.density_models[T].compute_density_ratio(D_test)
+                        
+                    elif self.density_ratio_model == "MLP":
+                        p_obs = density_model.predict_proba(D_test)[:,1]
+                        weight_test = (1-p_obs)/p_obs #TODO: double check
+
+                    
                     Y_train_test_mixed = np.concatenate((Y_train_obs, np.array([y_hat])), axis=0)
                     # self.fit(X_train_test_mixed, Y_train_test_mixed, T=T)
 

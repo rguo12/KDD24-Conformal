@@ -12,7 +12,9 @@ def get_config():
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--save_path', type=str, default='./results')
     parser.add_argument('--debug', type=bool, default=True)
-    parser.add_argument('--dataset', type=str, default='cevae')
+    parser.add_argument('--dataset', type=str, default='ihdp')
+    parser.add_argument('--density_ratio_model', type=str, default="MLP")
+
     args = parser.parse_args()
 
     return args
@@ -39,6 +41,7 @@ def main(args):
 
 
     for n_intervention in n_intervention_list:
+        
         if args.dataset == 'synthetic':
             df_o, df_i = generate_data(n_observation=n_observation,    
                                 n_intervention=n_intervention,
@@ -46,56 +49,64 @@ def main(args):
                                 gamma=0.5, 
                                 alpha=alpha,
                                 confouding=True)
+            
         elif args.dataset == 'cevae':
             df_o, df_i = generate_cevae_data(n_observation, n_intervention, err_scale = err_scale)
-        
-        
-        res = run_conformal(
-                            df_o,
-                            df_i,
-                            quantile_regression=True,
-                            n_folds=n_folds,
-                            alpha=alpha,
-                            test_frac=test_frac,
-                            target="counterfactual",
-                            method = 'naive')
-        utils.save_results(args, res, n_intervention)
 
 
-        res = run_conformal(
-                            df_o,
-                            df_i,
-                            quantile_regression=True,
-                            n_folds=n_folds,
-                            alpha=alpha,
-                            test_frac=test_frac,
-                            target="counterfactual",
-                            method = 'inexact')
+        elif args.dataset == 'ihdp':
+            if n_intervention > 500:
+                break
+            df_o, df_i = IHDP_w_HC(n_intervention, args.seed, d=24,
+              hidden_confounding=True, beta_u=None, root="data/IHDP")
         
-        utils.save_results(args, res, n_intervention)
-
-        res = run_conformal(
-                            df_o,
-                            df_i,
-                            quantile_regression=True,
-                            n_folds=n_folds,
-                            alpha=alpha,
-                            test_frac=test_frac,
-                            target="counterfactual",
-                            method = 'exact')
+        # # naive baseline
+        # res = run_conformal(
+        #                     df_o,
+        #                     df_i,
+        #                     quantile_regression=True,
+        #                     n_folds=n_folds,
+        #                     alpha=alpha,
+        #                     test_frac=test_frac,
+        #                     target="counterfactual",
+        #                     method = 'naive')
         
-        utils.save_results(args, res, n_intervention)
+        # utils.save_results(args, res, n_intervention)
 
 
-        res = weighted_conformal_prediction(df_o, 
-                                        quantile_regression=True, 
-                                        alpha=alpha, 
-                                        test_frac=test_frac,
-                                        target="counterfactual",
-                                        method='weighted CP')
+        # res = run_conformal(
+        #                     df_o,
+        #                     df_i,
+        #                     quantile_regression=True,
+        #                     n_folds=n_folds,
+        #                     alpha=alpha,
+        #                     test_frac=test_frac,
+        #                     target="counterfactual",
+        #                     method = 'inexact')
         
+        # utils.save_results(args, res, n_intervention)
+
+        # res = run_conformal(
+        #                     df_o,
+        #                     df_i,
+        #                     quantile_regression=True,
+        #                     n_folds=n_folds,
+        #                     alpha=alpha,
+        #                     test_frac=test_frac,
+        #                     target="counterfactual",
+        #                     method = 'exact')
         
-        utils.save_results(args, res, n_intervention)
+        # utils.save_results(args, res, n_intervention)
+
+
+        # res = weighted_conformal_prediction(df_o, 
+        #                                 quantile_regression=True, 
+        #                                 alpha=alpha, 
+        #                                 test_frac=test_frac,
+        #                                 target="counterfactual",
+        #                                 method='weighted CP')
+        
+        # utils.save_results(args, res, n_intervention)
 
         res = run_conformal(
                             df_o,
@@ -105,7 +116,8 @@ def main(args):
                             alpha=alpha,
                             test_frac=test_frac,
                             target="counterfactual",
-                            method = 'TCP')
+                            method = 'TCP',
+                            density_ratio_model=args.density_ratio_model)
         
         utils.save_results(args, res, n_intervention)
 

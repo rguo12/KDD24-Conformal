@@ -113,11 +113,12 @@ def standard_conformal(alpha, scores):
 def save_results(args, res, n_intervention):
     res['n_intervention'] = n_intervention
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
-
-    if not os.path.exists(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv'):
-        df.to_csv(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv')
+    fn = f'{args.save_path}/{args.dataset}/seed_{args.seed}.csv'
+    
+    if not os.path.exists(fn):
+        df.to_csv(fn)
     else:
-        df.to_csv(f'{args.save_path}/{args.dataset}_counterfactuals_{args.seed}.csv', mode='a', header=False)
+        df.to_csv(fn, mode='a', header=False)
     
     if args.debug:
         print(f"Weighted conformal prediction ({res['method']})")

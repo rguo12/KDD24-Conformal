@@ -24,3 +24,5 @@ models/__pycache__/*
 results
 notebooks
 __pycache__/*
+
+data/ihdp_class.py

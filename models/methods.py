@@ -165,7 +165,8 @@ def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, t
 
 def run_conformal(df_o, df_i, 
                   quantile_regression, 
-                  n_folds : int, alpha : float, test_frac : float, target : str, method : str):
+                  n_folds : int, alpha : float, test_frac : float, target : str, method : str,
+                  density_ratio_model : str = "MLP"):
     """_summary_
     Run naive CP on intervention, and our exact and inexact methods
 
@@ -248,7 +249,8 @@ def run_conformal(df_o, df_i,
                 n_folds=n_folds,
                 alpha=alpha / 2, 
                 base_learner="GBM", 
-                quantile_regression=False)
+                quantile_regression=False,
+                density_ratio_model=density_ratio_model)
             
             # alpha
             C0_l, C0_u = model.predict_counterfactual(X_test, T=0)
