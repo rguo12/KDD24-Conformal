@@ -14,7 +14,7 @@ params:
     hideParamByDefault: false
     groupName: ''
     selectOptions: []
-    # type: STR
+    type: STRING
     hintMsg: dataset name
   - arrayItemParams: {}
     multiDefaultValue: []
@@ -26,7 +26,7 @@ params:
     hideParamByDefault: false
     groupName: ''
     selectOptions: []
-    # type: STR
+    type: STRING
     hintMsg: path for output results
 # inputs:
   # - opt: false
