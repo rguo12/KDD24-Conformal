@@ -17,6 +17,7 @@ def get_config():
     # Model settings
     parser.add_argument('--base_learner', type=str, default="GBM")
     parser.add_argument('--density_ratio_model', type=str, default="MLP")
+    parser.add_argument('--n_estimators', type=int, default=20)
     parser.add_argument('--quantile_regression', type=bool, default=True, 
                         help="True for quantile regression, False for normal regression")
 
@@ -126,7 +127,8 @@ def main(args):
                             target="counterfactual",
                             method = 'TCP',
                             density_ratio_model=args.density_ratio_model,
-                            base_learner=args.base_learner)
+                            base_learner=args.base_learner,
+                            n_estimators=args.n_estimators)
         
         utils.save_results(args, res, n_intervention)
 

@@ -167,7 +167,8 @@ def run_conformal(df_o, df_i,
                   quantile_regression, 
                   n_folds : int, alpha : float, test_frac : float, target : str, method : str,
                   density_ratio_model : str = "MLP",
-                  base_learner : str = "RF"):
+                  base_learner : str = "RF",
+                  n_estimators:int = 10):
     """_summary_
     Run naive CP on intervention, and our exact and inexact methods
 
@@ -251,7 +252,8 @@ def run_conformal(df_o, df_i,
                 alpha=alpha / 2, 
                 base_learner=base_learner,
                 quantile_regression=quantile_regression,
-                density_ratio_model=density_ratio_model)
+                density_ratio_model=density_ratio_model,
+                n_estimators=n_estimators)
             
             # alpha
             C0_l, C0_u = model.predict_counterfactual(X_test, T=0)

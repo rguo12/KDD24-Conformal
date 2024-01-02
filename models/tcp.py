@@ -8,6 +8,7 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from quantile_forest import RandomForestQuantileRegressor
+from sklearn import preprocessing
 # import density_ratio_estimation.src.densityratio as densityratio
 from densratio import densratio
 from concurrent.futures import ProcessPoolExecutor
@@ -30,7 +31,7 @@ class BaseCP:
     
     def __init__(self, data_obs, data_inter, n_folds,
                  alpha=0.1, base_learner="RF", 
-                 quantile_regression=True, n_estimators_target : int = 50):
+                 quantile_regression=True, n_estimators : int = 10):
 
         """
         Base class for conformal prediction, including transductive and split naive, inexact and exact.
@@ -54,19 +55,20 @@ class BaseCP:
         
         if self.quantile_regression:
             if self.base_learner == "GBM":
-                self.first_CQR_args_u = dict({"loss": "quantile", "alpha":1 - (self.alpha / 2), "n_estimators": n_estimators_target}) 
-                self.first_CQR_args_l = dict({"loss": "quantile", "alpha":self.alpha/2, "n_estimators": n_estimators_target}) 
+                self.first_CQR_args_u = dict({"loss": "quantile", "alpha":1 - (self.alpha / 2), "n_estimators": n_estimators}) 
+                self.first_CQR_args_l = dict({"loss": "quantile", "alpha":self.alpha/2, "n_estimators": n_estimators})
+
             elif self.base_learner == "RF":
-                self.first_CQR_args_u = dict({"default_quantiles":1 - (self.alpha/2), "n_estimators": n_estimators_target})
-                self.first_CQR_args_l = dict({"default_quantiles":self.alpha/2, "n_estimators": n_estimators_target})
+                self.first_CQR_args_u = dict({"default_quantiles":1 - (self.alpha/2), "n_estimators": n_estimators})
+                self.first_CQR_args_l = dict({"default_quantiles":self.alpha/2, "n_estimators": n_estimators})
             else:
                 raise ValueError('base_learner must be one of GBM or RF')
             
         else:
             if self.base_learner == "GBM":
-                self.first_CQR_args = dict({"loss": "squared_error", "n_estimators": n_estimators_target}) 
+                self.first_CQR_args = dict({"loss": "squared_error", "n_estimators": n_estimators}) 
             elif self.base_learner == "RF":
-                self.first_CQR_args = dict({"criterion": "squared_error", "n_estimators": n_estimators_target}) 
+                self.first_CQR_args = dict({"criterion": "squared_error", "n_estimators": n_estimators}) 
             else:
                 raise ValueError('base_learner must be one of GBM or RF')
 
@@ -408,7 +410,7 @@ class SplitCP(BaseCP):
 class TCP(BaseCP):
     def __init__(self, data_obs, data_inter, n_folds,
                  alpha=0.1, base_learner:str="GBM", quantile_regression:bool=False, K:int = 10,
-                 density_ratio_model="MLP", seed=1):
+                 density_ratio_model="MLP", seed=1, n_estimators:int=10):
 
         """
         Transductive conformal prediction, our method for Theorem 1
@@ -424,30 +426,36 @@ class TCP(BaseCP):
             :param DR_model: "DR" (traditional density ratio estimator) or "MLP" (MLP classifier classifying obs and int)
 
         """
-        super().__init__(data_obs, data_inter, n_folds, alpha, base_learner, quantile_regression)
+        super().__init__(data_obs, data_inter, n_folds, alpha, base_learner, quantile_regression, n_estimators)
         self.K = K
         self.models = {}
         self.density_models = {}
         self.density_ratio_model = density_ratio_model
         self.seed = seed
+        self.n_estimators = n_estimators
 
     def data_preproc(self, X_test, T):
-        # random select one fold
-        # j = random.randint(0,self.n_folds-1)
-        # i = random.randint(0,self.n_folds-1)
 
-        # select the 1st fold
         i = j = 0
+
+        # random select one fold
+        while i == j:
+            j = random.randint(0,self.n_folds-1)
+            i = random.randint(0,self.n_folds-1)
+
+        # here, I allow hat_y to be max value of Y by setting self.K+1 values for hat_y
+        # Need n_fold ** 2 * n_test * K models...
+        X_train_obs = self.X_train_obs_list[i][self.T_train_obs_list[i]==T, :]
+        Y_train_obs = self.Y_train_obs_list[i][self.T_train_obs_list[i]==T]
 
         X_train_inter = self.X_train_inter_list[j][self.T_train_inter_list[j]==T, :]
         Y_train_inter = self.Y_train_inter_list[j][self.T_train_inter_list[j]==T]
         n_test_inter = X_test.shape[0]
-        
-        # here, I allow hat_y to be max value of Y by setting self.K+1 values for hat_y
-        # Need n_fold ** 2 * n_test * K models...
 
-        X_train_obs = self.X_train_obs_list[i][self.T_train_obs_list[i]==T, :]
-        Y_train_obs = self.Y_train_obs_list[i][self.T_train_obs_list[i]==T]
+        # standize X
+        scaler = preprocessing.StandardScaler().fit(X_train_obs)
+        X_train_obs = scaler.transform(X_train_obs)
+        X_train_inter = scaler.transform(X_train_inter)
                 
         # discretize Y
         Y_train_all = np.concatenate([Y_train_obs, Y_train_inter])
@@ -567,6 +575,7 @@ class TCP(BaseCP):
                         scores = np.maximum(
                             Y_hat_l - Y_train_test_mixed, 
                             Y_train_test_mixed - Y_hat_u)
+                        
                         scores = np.maximum(scores, 0.0)
 
                     else:

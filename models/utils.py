@@ -114,7 +114,7 @@ def save_results(args, res, n_intervention):
     res['n_intervention'] = n_intervention
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     
-    run_name = f"{args.base_learner}_{args.density_model}_seed_{args.seed}"
+    run_name = f"{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_seed_{args.seed}"
 
     fn = f'{args.save_path}/{args.dataset}/{run_name}.csv'
     
