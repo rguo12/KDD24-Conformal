@@ -47,17 +47,17 @@ params:
   #     photonxType: image_cls
   #   type: PHOTONX_DATASET
   #   hintMsg: 测试集
-outputs:
-  - opt: True
-    name: output_folder
-    variableLength: false
-    defaultValue: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
-    # subtype: ''
-    # creationParams:
-    #   photonxStorage: ''
-    #   photonxType: ''
-    # type: STR
-    hintMsg: hdfs folder to save results
+# outputs:
+#   - opt: True
+#     name: output_folder
+#     variableLength: false
+#     defaultValue: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
+#     # subtype: ''
+#     # creationParams:
+#     #   photonxStorage: ''
+#     #   photonxType: ''
+#     # type: STR
+#     hintMsg: hdfs folder to save results
 entryPoint: /opt/tiger/causal_TCP/rh2_entrypoint.py
 lazyDownloadCode: true
 resource:
