@@ -26,3 +26,6 @@ notebooks
 __pycache__/*
 
 data/ihdp_class.py
+
+my_credentials.json
+run_arnold.py
