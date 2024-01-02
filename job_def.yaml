@@ -14,8 +14,20 @@ params:
     hideParamByDefault: false
     groupName: ''
     selectOptions: []
-    type: STR
+    # type: STR
     hintMsg: dataset name
+  - arrayItemParams: {}
+    multiDefaultValue: []
+    name: output_folder
+    isAdvance: false
+    defaultValue: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
+    required: false
+    allowCustom: false
+    hideParamByDefault: false
+    groupName: ''
+    selectOptions: []
+    # type: STR
+    hintMsg: path for output results
 # inputs:
   # - opt: false
   #   name: train_dataset
@@ -36,7 +48,7 @@ params:
   #   type: PHOTONX_DATASET
   #   hintMsg: 测试集
 outputs:
-  - opt: false
+  - opt: True
     name: output_folder
     variableLength: false
     defaultValue: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
@@ -44,7 +56,7 @@ outputs:
     # creationParams:
     #   photonxStorage: ''
     #   photonxType: ''
-    type: STR
+    # type: STR
     hintMsg: hdfs folder to save results
 entryPoint: /opt/tiger/causal_TCP/rh2_entrypoint.py
 lazyDownloadCode: true
