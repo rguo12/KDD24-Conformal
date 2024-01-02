@@ -13,7 +13,11 @@ def get_config():
     parser.add_argument('--save_path', type=str, default='./results')
     parser.add_argument('--debug', type=bool, default=True)
     parser.add_argument('--dataset', type=str, default='ihdp')
+
+    # Model settings
     parser.add_argument('--density_ratio_model', type=str, default="MLP")
+    parser.add_argument('--quantile_regression', type=bool, default=True, 
+                        help="True for quantile regression, False for normal regression")
 
     args = parser.parse_args()
 
@@ -55,6 +59,9 @@ def main(args):
 
 
         elif args.dataset == 'ihdp':
+            # as ihdp is a small dataset w. 740+ samples
+            # we only allow the n_intervention to be no larger than 500
+
             if n_intervention > 500:
                 break
             df_o, df_i = IHDP_w_HC(n_intervention, args.seed, d=24,
@@ -111,7 +118,7 @@ def main(args):
         res = run_conformal(
                             df_o,
                             df_i,
-                            quantile_regression=False, # QR not implemented yet
+                            quantile_regression=args.quantile_regression, # QR not implemented yet
                             n_folds=n_folds,
                             alpha=alpha,
                             test_frac=test_frac,

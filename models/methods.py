@@ -249,7 +249,7 @@ def run_conformal(df_o, df_i,
                 n_folds=n_folds,
                 alpha=alpha / 2, 
                 base_learner="GBM", 
-                quantile_regression=False,
+                quantile_regression=quantile_regression,
                 density_ratio_model=density_ratio_model)
             
             # alpha

@@ -429,41 +429,8 @@ class TCP(BaseCP):
         self.density_models = {}
         self.density_ratio_model = density_ratio_model
         self.seed = seed
-    # def fit(self, X, y, T, model):
-    #     """
-    #     Fits the plug-in models and meta-learners using the sample (X, W, Y) and true propensity scores pscores
-    #     """
-    #     if T == 0:
-    #         self.models_0.fit(X, y)
-    #     elif T == 1:
-    #         self.models_1.fit(X, y)
-    #     else:
-    #         raise ValueError("T must be in {0,1}")
 
-    def predict_counterfactual(self, X_test, T=1):
-        # Fit regression models on (x_1,y_1,...,x_M+1,y) for all y \in \mathcal{Y}
-        # Need n_fold ** 2 * n_test * K models...
-
-        if self.quantile_regression:
-            # self.models_u_0 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
-            # self.models_l_0 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_l) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
-            # self.models_u_1 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
-            # self.models_l_1 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_l) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
-            raise NotImplementedError("Only support quantile_regression = False")
-        else:
-            # self.models = [[[base_learners_dict[self.base_learner](**self.first_CQR_args) for _ in range(self.K)] for _ in range(self.n_folds)] for _ in range(self.n_folds)]
-            # self.models_0 = [[base_learners_dict[self.base_learner](**self.first_CQR_args) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
-            # self.models = []
-            pass
-
-        # self.density_models_0 = [[None for _ in range(self.n_folds)] for _ in range(self.n_folds)]
-
-        # need n_fold ** 2 density models
-        self.density_models = [[None for _ in range(self.n_folds)] for _ in range(self.n_folds)]
-
-        y_test_min = [] # n_test
-        y_test_max = [] # n_test
-
+    def data_preproc(self, X_test, T):
         # random select one fold
         # j = random.randint(0,self.n_folds-1)
         # i = random.randint(0,self.n_folds-1)
@@ -473,13 +440,10 @@ class TCP(BaseCP):
 
         X_train_inter = self.X_train_inter_list[j][self.T_train_inter_list[j]==T, :]
         Y_train_inter = self.Y_train_inter_list[j][self.T_train_inter_list[j]==T]
-
         n_test_inter = X_test.shape[0]
         
         # here, I allow hat_y to be max value of Y by setting self.K+1 values for hat_y
-        self.models[T] = [[base_learners_dict[self.base_learner](**self.first_CQR_args) for _ in range(self.K+1)]
-                                        for _ in range(n_test_inter)]
-
+        # Need n_fold ** 2 * n_test * K models...
         X_train_obs = self.X_train_obs_list[i][self.T_train_obs_list[i]==T, :]
         Y_train_obs = self.Y_train_obs_list[i][self.T_train_obs_list[i]==T]
                 
@@ -498,7 +462,28 @@ class TCP(BaseCP):
         D_obs = np.concatenate((X_train_obs, Y_train_obs_dis[:, None]), axis=1)
         D_inter = np.concatenate((X_train_inter, Y_train_inter_dis[:, None]), axis=1)
 
-        if self.density_ratio_model == "DR":
+        return n_test_inter, D_obs, D_inter, X_train_obs, Y_train_obs, Y_bins
+
+
+    def init_models(self, T, n_test_inter):
+        if self.quantile_regression:
+            assert(self.base_learner)
+            self.models[T] = {}
+            self.models[T]["upper"] = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.K+1)]
+                                        for _ in range(n_test_inter)]
+            self.models[T]["lower"] = [[base_learners_dict[self.base_learner](**self.first_CQR_args_l) for _ in range(self.K+1)]
+                                        for _ in range(n_test_inter)]
+            # raise NotImplementedError("Only support quantile_regression = False")
+
+        else:
+            # for each test sample, each random split
+            self.models[T] = [[base_learners_dict[self.base_learner](**self.first_CQR_args) for _ in range(self.K+1)]
+                                        for _ in range(n_test_inter)]
+            pass
+    
+    def train_density_model(self, T, D_inter, D_obs):
+        if self.density_ratio_model == "DR": # density ratio estimator
+
             density_model = densratio(D_inter, D_obs, alpha=0.01)
             self.density_models[T] = density_model # save density ratio model
             weights_train = density_model.compute_density_ratio(D_obs)
@@ -522,6 +507,25 @@ class TCP(BaseCP):
 
             weights_train = (1-p_obs)/p_obs #TODO: double check
 
+        return density_model, weights_train
+
+    def predict_counterfactual(self, X_test, T=1):
+        # Fit regression models for T=1 or T=0 on obs + inter data (x_1,y_1,...,x_M+1,y) for all y \in \mathcal{Y}
+
+        # self.density_models_0 = [[None for _ in range(self.n_folds)] for _ in range(self.n_folds)]
+
+        # need n_fold ** 2 density models
+        self.density_models = [[None for _ in range(self.n_folds)] for _ in range(self.n_folds)]
+
+        y_test_min = [] # n_test
+        y_test_max = [] # n_test
+
+        n_test_inter, D_obs, D_inter, X_train_obs, Y_train_obs, Y_bins = self.data_preproc(X_test,T)
+
+        self.init_models(T, n_test_inter)
+
+        density_model, weights_train = self.train_density_model(T, D_inter, D_obs)
+
         # save results
         y_test_min = np.zeros(n_test_inter)
         y_test_max = np.zeros(n_test_inter)
@@ -537,28 +541,45 @@ class TCP(BaseCP):
 
                 for k, y_hat in enumerate(Y_bins):
                     D_test = np.array(np.concatenate((x_test, np.array([y_hat])), axis=0)[None, :])
+
                     if self.density_ratio_model == "DR":
                         weight_test = self.density_models[T].compute_density_ratio(D_test)
                         
                     elif self.density_ratio_model == "MLP":
                         p_obs = density_model.predict_proba(D_test)[:,1]
                         weight_test = (1-p_obs)/p_obs #TODO: double check
-
                     
                     Y_train_test_mixed = np.concatenate((Y_train_obs, np.array([y_hat])), axis=0)
                     # self.fit(X_train_test_mixed, Y_train_test_mixed, T=T)
 
-                    model = self.models[T][test_idx][k]
-                    model.fit(X_train_test_mixed, Y_train_test_mixed)
+                    if self.quantile_regression:
+                        model_u = self.models[T]["upper"][test_idx][k]
+                        model_l = self.models[T]["lower"][test_idx][k]
+                        model_u.fit(X_train_test_mixed, Y_train_test_mixed)
+                        model_l.fit(X_train_test_mixed, Y_train_test_mixed)
 
-                    Y_hat = model.predict(X_train_test_mixed)
-                    scores = np.abs(Y_hat - Y_train_test_mixed)
+                        Y_hat_l = model_l.predict(X_train_test_mixed)
+                        Y_hat_u = model_u.predict(X_train_test_mixed)
+
+                        scores = np.maximum(
+                            Y_hat_l - Y_train_test_mixed, 
+                            Y_train_test_mixed - Y_hat_u)
+                        scores = np.maximum(scores, 0.0)
+
+                    else:
+                        model = self.models[T][test_idx][k]
+                        model.fit(X_train_test_mixed, Y_train_test_mixed)
+
+                        Y_hat = model.predict(X_train_test_mixed)
+                        scores = np.abs(Y_hat - Y_train_test_mixed)
+
                     offset = utils.weighted_transductive_conformal(
                         self.alpha, weights_train, weight_test, scores)
                     
                     print("Scores[-1]:{}, Offset:{}".format(scores[-1], offset))
                     if scores[-1] < offset:
                         # compare test sample score with offset
+                        # append to y_interval iff scores[-1] < offset
                         y_interval.append(float(y_hat))
 
                 y_test_min[test_idx] = min(y_interval)
