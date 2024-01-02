@@ -13,6 +13,7 @@ def get_config():
     parser.add_argument('--save_path', type=str, default='./results')
     parser.add_argument('--debug', type=bool, default=True)
     parser.add_argument('--dataset', type=str, default='ihdp')
+    parser.add_argument('--output_folder', type=str, default=None) # keep it as None for local exp
 
     # Model settings
     parser.add_argument('--methods', type=list, default=['naive', 'inexact', 'exact', 'weighted CP',

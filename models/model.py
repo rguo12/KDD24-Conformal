@@ -1,7 +1,7 @@
-import jax
-import jax.numpy as jnp
-import flax.linen as nn
-import optax
+# import jax
+# import jax.numpy as jnp
+# import flax.linen as nn
+# import optax
 
 class LinearRegression:
     def __init__(self):

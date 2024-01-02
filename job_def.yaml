@@ -1,0 +1,64 @@
+icm_image: lab.pytorch:latest
+gitRepo:
+  branchName: rc_dev1
+  mnt: /opt/tiger/causal_TCP
+  repoName: ai-lab-london/causal_TCP
+params:
+  - arrayItemParams: {}
+    multiDefaultValue: []
+    name: dataset
+    isAdvance: false
+    defaultValue: 'ihdp'
+    required: false
+    allowCustom: false
+    hideParamByDefault: false
+    groupName: ''
+    selectOptions: []
+    type: STR
+    hintMsg: dataset name
+# inputs:
+  # - opt: false
+  #   name: train_dataset
+  #   variableLength: false
+  #   subtype: ''
+  #   creationParams:
+  #     photonxStorage: hdfs
+  #     photonxType: image_cls
+  #   type: PHOTONX_DATASET
+  #   hintMsg: 训练集
+  # - opt: false
+  #   name: test_dataset
+  #   variableLength: false
+  #   subtype: ''
+  #   creationParams:
+  #     photonxStorage: hdfs
+  #     photonxType: image_cls
+  #   type: PHOTONX_DATASET
+  #   hintMsg: 测试集
+outputs:
+  - opt: false
+    name: output_folder
+    variableLength: false
+    defaultValue: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
+    # subtype: ''
+    # creationParams:
+    #   photonxStorage: ''
+    #   photonxType: ''
+    type: STR
+    hintMsg: hdfs folder to save results
+entryPoint: /opt/tiger/causal_TCP/rh2_entrypoint.py
+lazyDownloadCode: true
+resource:
+  arnoldConfig:
+    cluster_name: 'cloudnative-lq'
+    group_names: ['LITG']
+    roles:
+      - name: worker
+        num: 1
+        memory: 8192
+        gpu: 0
+        gpuv: NONE
+        cpu: 20
+  backend: ARNOLD
+name: my_test.causal_TCP # 你的模板名称, 整站全局唯一
+pythonVersion: PYTHON3
