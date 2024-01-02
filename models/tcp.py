@@ -4,7 +4,7 @@ import sys, os, time, random
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, GradientBoostingClassifier
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from quantile_forest import RandomForestQuantileRegressor
@@ -29,7 +29,8 @@ base_learners_dict = dict({"GBM": GradientBoostingRegressor,
 class BaseCP:
     
     def __init__(self, data_obs, data_inter, n_folds,
-                 alpha=0.1, base_learner="GBM", quantile_regression=True, n_estimators_target : int = 10):
+                 alpha=0.1, base_learner="RF", 
+                 quantile_regression=True, n_estimators_target : int = 50):
 
         """
         Base class for conformal prediction, including transductive and split naive, inexact and exact.
@@ -444,6 +445,7 @@ class TCP(BaseCP):
         
         # here, I allow hat_y to be max value of Y by setting self.K+1 values for hat_y
         # Need n_fold ** 2 * n_test * K models...
+
         X_train_obs = self.X_train_obs_list[i][self.T_train_obs_list[i]==T, :]
         Y_train_obs = self.Y_train_obs_list[i][self.T_train_obs_list[i]==T]
                 
@@ -489,6 +491,7 @@ class TCP(BaseCP):
             weights_train = density_model.compute_density_ratio(D_obs)
 
         elif self.density_ratio_model == "MLP":
+
             density_model = MLPClassifier(random_state=self.seed, max_iter=100)
 
             # Assigning labels
@@ -524,7 +527,7 @@ class TCP(BaseCP):
 
         self.init_models(T, n_test_inter)
 
-        density_model, weights_train = self.train_density_model(T, D_inter, D_obs)
+        _, weights_train = self.train_density_model(T, D_inter, D_obs)
 
         # save results
         y_test_min = np.zeros(n_test_inter)
@@ -546,7 +549,7 @@ class TCP(BaseCP):
                         weight_test = self.density_models[T].compute_density_ratio(D_test)
                         
                     elif self.density_ratio_model == "MLP":
-                        p_obs = density_model.predict_proba(D_test)[:,1]
+                        p_obs = self.density_models[T].predict_proba(D_test)[:,1]
                         weight_test = (1-p_obs)/p_obs #TODO: double check
                     
                     Y_train_test_mixed = np.concatenate((Y_train_obs, np.array([y_hat])), axis=0)

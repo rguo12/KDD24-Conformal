@@ -15,6 +15,7 @@ def get_config():
     parser.add_argument('--dataset', type=str, default='ihdp')
 
     # Model settings
+    parser.add_argument('--base_learner', type=str, default="GBM")
     parser.add_argument('--density_ratio_model', type=str, default="MLP")
     parser.add_argument('--quantile_regression', type=bool, default=True, 
                         help="True for quantile regression, False for normal regression")
@@ -124,7 +125,8 @@ def main(args):
                             test_frac=test_frac,
                             target="counterfactual",
                             method = 'TCP',
-                            density_ratio_model=args.density_ratio_model)
+                            density_ratio_model=args.density_ratio_model,
+                            base_learner=args.base_learner)
         
         utils.save_results(args, res, n_intervention)
 

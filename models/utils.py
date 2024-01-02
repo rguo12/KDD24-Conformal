@@ -113,7 +113,10 @@ def standard_conformal(alpha, scores):
 def save_results(args, res, n_intervention):
     res['n_intervention'] = n_intervention
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
-    fn = f'{args.save_path}/{args.dataset}/seed_{args.seed}.csv'
+    
+    run_name = f"{args.base_learner}_{args.density_model}_seed_{args.seed}"
+
+    fn = f'{args.save_path}/{args.dataset}/{run_name}.csv'
     
     if not os.path.exists(fn):
         df.to_csv(fn)
