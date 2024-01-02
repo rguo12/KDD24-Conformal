@@ -3,6 +3,8 @@
 params:
   - name: dataset
     value: 'ihdp'
+  - name: output_folder
+    value: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
  
 # 对于所有的输入输出类型，可以参考这里
 # 模板的输入
@@ -21,11 +23,11 @@ params:
 resource:
   arnoldConfig:
     cluster_name: 'cloudnative-lq'
-    group_names: ['labvc_bigmem']
+    group_names: ['LITG']
     roles:
       - name: worker
         num: 1
-        memory: 8192
+        memory: 20480
         gpu: 0
         gpuv: NONE
-        cpu: 4
+        cpu: 20
