@@ -19,16 +19,18 @@ dataset = env.params.dataset
 # output_model_path = env.outputs.output_model.meta.hdfs_dir
 output_folder = env.params.output_folder
 
+print(f"output folder is {output_folder}")
+
 # train code
-cmd = f'''python3 run_syn.py --dataset={dataset} --output_folder={output_folder}'''
+cmd = f'''python3 run_syn.py --dataset={dataset}'''
 print(f'cmd: {cmd}')
 exit_code = subprocess.call(cmd, shell=True)
 
 # copy generated model back to rh2
 if exit_code == 0:
     print("done")
-    # subprocess.call(
-    #     f'hadoop fs -copyFromLocal mnist_cnn.pt {output_folder}', shell=True)
+    subprocess.call(
+        f'hadoop fs -copyFromLocal ./results/{dataset}/* {output_folder}/{dataset}/', shell=True)
 
     # client = create_or_get_rh2_client()
     # client.write_output_custom_meta(output_model_id, 'PYTORCH', {
