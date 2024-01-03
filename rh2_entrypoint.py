@@ -30,7 +30,7 @@ else:
 print(f"output folder is {output_folder}")
 
 # train code
-cmd = f'''python3 run_syn.py --dataset={dataset} --save_path={local_save_path}'''
+cmd = f'''python3 opt/tiger/causal_TCP/run_syn.py --dataset={dataset} --save_path={local_save_path}'''
 print(f'cmd: {cmd}')
 exit_code = subprocess.call(cmd, shell=True)
 
