@@ -71,7 +71,7 @@ def main(args):
             if n_intervention > 500:
                 break
             df_o, df_i = IHDP_w_HC(n_intervention, args.seed, d=24,
-              hidden_confounding=True, beta_u=None, root="data/IHDP")
+              hidden_confounding=True, beta_u=None, root="/mnt/bn/confrank2/causal_TCP/data/IHDP")
         
         # naive baseline
         if 'naive' in args.methods:

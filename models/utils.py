@@ -116,10 +116,9 @@ def save_results(args, res, n_intervention):
     
     run_name = f"{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_seed_{args.seed}"
 
-    # if args.output_folder is None:
     folder_name = os.path.join(args.save_path,args.dataset) #local path
-    # else:
-    # folder_name = os.path.join(args.output_folder,args.dataset)
+    if not os.path.isdir(folder_name):
+        os.mkdir(folder_name)
 
     fn = os.path.join(folder_name,f'{run_name}.csv')
 

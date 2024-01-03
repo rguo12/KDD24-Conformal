@@ -244,7 +244,7 @@ def generate_data(n_observation, n_intervention, d, gamma, alpha, confouding):
 
 
 def IHDP_w_HC(n_intervention, seed, d=1,
-              hidden_confounding=True, beta_u=None, root="data/IHDP"):
+              hidden_confounding=True, beta_u=None, root="./data/IHDP"):
     # adapted from https://github.com/anndvision/quince/blob/main/quince/library/datasets/ihdp.py
 
     """
@@ -297,11 +297,11 @@ def IHDP_w_HC(n_intervention, seed, d=1,
         "b.marr",
     ]
 
-    root = Path.home() / "quince_datasets" if root is None else Path(root)
-    data_path = root / "ihdp.RData"
+    # root = Path.home() / "quince_datasets" if root is None else Path(root)
+    data_path = os.path.join(root,"ihdp.RData")
     # Download data if necessary
-    if not data_path.exists():
-        root.mkdir(parents=True, exist_ok=True)
+    if not os.path.isfile(data_path):
+        # root.mkdir(parents=True, exist_ok=True)
         r = requests.get(
             "https://github.com/vdorie/npci/raw/master/examples/ihdp_sim/data/ihdp.RData"
         )
