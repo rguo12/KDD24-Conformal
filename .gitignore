@@ -18,6 +18,7 @@ commands
 wandb/
 data/
 .vscode/
+arnold/
 
 data/__pycache__/*
 models/__pycache__/*
