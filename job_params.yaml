@@ -1,0 +1,33 @@
+# 对于所有的参数类型，可以参考这里
+# 模板的参数
+params:
+  - name: dataset
+    value: 'ihdp'
+  - name: output_folder
+    value: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
+ 
+# 对于所有的输入输出类型，可以参考这里
+# 模板的输入
+# inputs:
+#   train_dataset:
+#     id: 47cb00a5d0b617f5
+#   test_dataset:
+#     id: 883f0adf0291cb7e
+
+# 模板的输出
+# outputs:
+#   output_folder:
+#     caption: hongkai.train.mnist-MODEL_copy_1-MODEL
+#     id: '@new'
+ 
+resource:
+  arnoldConfig:
+    cluster_name: 'cloudnative-lq'
+    group_names: ['LITG']
+    roles:
+      - name: worker
+        num: 1
+        memory: 20480
+        gpu: 0
+        gpuv: NONE
+        cpu: 20

@@ -23,4 +23,9 @@ data/__pycache__/*
 models/__pycache__/*
 results
 notebooks
-__pycache__/
+__pycache__/*
+
+data/ihdp_class.py
+
+my_credentials.json
+run_arnold.py
