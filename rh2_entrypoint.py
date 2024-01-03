@@ -26,18 +26,17 @@ dataset = env.params.dataset
 output_folder = env.params.output_folder
 
 # local_save_path = "/mnt/bn/confrank2/causal_TCP/results/"
-local_save_path = "./causal_TCP/results/"
-if os.path.exists(local_save_path):
-    pass
-else:
+subprocess.call('''cd causal_TCP''', shell=True)
+
+local_save_path = "./results/"
+if not os.path.exists(local_save_path):
     os.mkdir(local_save_path)
 print(f"output folder is {output_folder}")
 
 # train code
-# subprocess.call('''cd causal_TCP''', shell=True)
 
 # cmd = f'''python3 run_syn.py --dataset={dataset} --save_path={local_save_path}'''
-cmd = f'''python3 causal_TCP/run_syn.py --dataset={dataset} --save_path={local_save_path}'''
+cmd = f'''python3 run_syn.py --dataset={dataset} --save_path={local_save_path}'''
 
 print(f'cmd: {cmd}')
 exit_code = subprocess.call(cmd, shell=True)

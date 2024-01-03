@@ -22,7 +22,7 @@ params:
  
 resource:
   arnoldConfig:
-    cluster_name: 'cloudnative-lq'
+    cluster_name: 'cloudnative-hl'
     group_names: ['LITG']
     roles:
       - name: worker

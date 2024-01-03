@@ -324,6 +324,7 @@ def IHDP_w_HC(n_intervention, seed, d=1,
     u = df[_HIDDEN_COVARIATE]
     t = df["treat"]
 
+    # randomly select coefficients for x and u
     beta_x = rng.choice(
         [0.0, 0.1, 0.2, 0.3, 0.4], size=(24,), p=[0.6, 0.1, 0.1, 0.1, 0.1]
     )
