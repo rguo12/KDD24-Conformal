@@ -16,7 +16,7 @@ def get_config():
     parser.add_argument('--output_folder', type=str, default=None) # keep it as None for local exp
 
     # Model settings
-    parser.add_argument('--methods', type=list, default=['naive', 'inexact', 'exact', 'weighted CP',
+    parser.add_argument('--methods', type=list, default=['naive', 'inexact', 'exact', 'weighted CP', 'TCP'
                                                           ])
 
     parser.add_argument('--base_learner', type=str, default="GBM")
