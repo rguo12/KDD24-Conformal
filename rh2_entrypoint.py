@@ -1,6 +1,7 @@
 import subprocess
 import os
-# import torch
+
+import torch
 from rh2.sdk.env import get_rh2_env
 from rh2.sdk.sdk_rh2_client import create_or_get_rh2_client
 
@@ -39,6 +40,7 @@ if exit_code == 0:
     subprocess.call(
         f'hadoop fs -copyFromLocal /opt/tiger/causal_TCP/results/{dataset}/* {output_folder}/{dataset}/', shell=True)
 
-    # client = create_or_get_rh2_client()
-    # client.write_output_custom_meta(output_model_id, 'PYTORCH', {
-    #                                 'version': torch.__version__})
+    client = create_or_get_rh2_client()
+    client.write_output_custom_meta(dataset, local_save_path, output_folder, 'PYTORCH', {
+                                    'version': torch.__version__})
+
