@@ -1,6 +1,6 @@
 import subprocess
-
-import torch
+import os
+# import torch
 from rh2.sdk.env import get_rh2_env
 from rh2.sdk.sdk_rh2_client import create_or_get_rh2_client
 
@@ -19,10 +19,17 @@ dataset = env.params.dataset
 # output_model_path = env.outputs.output_model.meta.hdfs_dir
 output_folder = env.params.output_folder
 
+
+local_save_path = "/opt/tiger/causal_TCP/results/"
+if os.path.exists(local_save_path):
+    pass
+else:
+    os.mkdir(local_save_path)
+
 print(f"output folder is {output_folder}")
 
 # train code
-cmd = f'''python3 run_syn.py --dataset={dataset}'''
+cmd = f'''python3 run_syn.py --dataset={dataset} --save_path={local_save_path}'''
 print(f'cmd: {cmd}')
 exit_code = subprocess.call(cmd, shell=True)
 
@@ -30,7 +37,7 @@ exit_code = subprocess.call(cmd, shell=True)
 if exit_code == 0:
     print("done")
     subprocess.call(
-        f'hadoop fs -copyFromLocal ./results/{dataset}/* {output_folder}/{dataset}/', shell=True)
+        f'hadoop fs -copyFromLocal /opt/tiger/causal_TCP/results/{dataset}/* {output_folder}/{dataset}/', shell=True)
 
     # client = create_or_get_rh2_client()
     # client.write_output_custom_meta(output_model_id, 'PYTORCH', {
