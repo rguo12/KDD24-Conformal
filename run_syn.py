@@ -42,7 +42,7 @@ def get_config():
 def main(args):
     # Get the current time
     current_time = datetime.now()
-    cur_time = current_time.strftime("%m-%d %H:%M:%S")
+    cur_time = current_time.strftime("%m-%d")
 
     args = utils.preprocess(args)
     np.random.seed(args.seed)
