@@ -6,7 +6,7 @@ params:
   # - name: output_folder
   #   value: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
   - name: n_intervention
-     multi_value: [100, 200, 300, 400, 500]
+     multi_value: ["100", "200", "300", "400", "500"]
 
  
 # 对于所有的输入输出类型，可以参考这里
