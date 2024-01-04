@@ -31,7 +31,7 @@ class BaseCP:
     
     def __init__(self, data_obs, data_inter, n_folds,
                  alpha=0.1, base_learner="RF", 
-                 quantile_regression=True, n_estimators : int = 10):
+                 quantile_regression=True, n_estimators : int = 10, calib_frac=0.25):
 
         """
         Base class for conformal prediction, including transductive and split naive, inexact and exact.
@@ -74,8 +74,8 @@ class BaseCP:
 
         self.data_obs = data_obs
         self.data_inter = data_inter
-        self.train_obs_index_list, self.X_train_obs_list, self.T_train_obs_list, self.Y_train_obs_list, self.calib_obs_index_list, self.X_calib_obs_list, self.T_calib_obs_list, self.Y_calib_obs_list = utils.split_data(data_obs, n_folds, frac=0.75)
-        self.train_inter_index_list, self.X_train_inter_list, self.T_train_inter_list, self.Y_train_inter_list, self.calib_inter_index_list, self.X_calib_inter_list, self.T_calib_inter_list, self.Y_calib_inter_list = utils.split_data(data_inter, n_folds, frac=0.75)      
+        self.train_obs_index_list, self.X_train_obs_list, self.T_train_obs_list, self.Y_train_obs_list, self.calib_obs_index_list, self.X_calib_obs_list, self.T_calib_obs_list, self.Y_calib_obs_list = utils.split_data(data_obs, n_folds, frac=1-calib_frac)
+        self.train_inter_index_list, self.X_train_inter_list, self.T_train_inter_list, self.Y_train_inter_list, self.calib_inter_index_list, self.X_calib_inter_list, self.T_calib_inter_list, self.Y_calib_inter_list = utils.split_data(data_inter, n_folds, frac=1-calib_frac)      
         
         return
 
@@ -119,7 +119,7 @@ class SplitCP(BaseCP):
         """
         Fits the plug-in models and meta-learners using the sample (X, W, Y) and true propensity scores pscores
         """
-        if method == 'two_stage_inexact' or method == 'two_stage_exact':
+        if method in ['two_stage_inexact', 'two_stage_exact']:
             self.models_u_0 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
             self.models_l_0 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_l) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
             self.models_u_1 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
@@ -141,6 +141,8 @@ class SplitCP(BaseCP):
                 Y_train_inter_1 = self.Y_train_inter_list[j][self.T_train_inter_list[j]==1]
 
                 for i in tqdm(range(self.n_folds)):
+                    # i == j is okay as obs and inter data are different
+
                     X_train_obs_0 = self.X_train_obs_list[i][self.T_train_obs_list[i]==0, :]
                     Y_train_obs_0 = self.Y_train_obs_list[i][self.T_train_obs_list[i]==0]
                     X_train_obs_1 = self.X_train_obs_list[i][self.T_train_obs_list[i]==1, :]
@@ -434,14 +436,14 @@ class TCP(BaseCP):
         self.seed = seed
         self.n_estimators = n_estimators
 
-    def data_preproc(self, X_test, T):
+    def data_preproc(self, X_test, T, standardize=True):
 
-        i = j = 0
+        # i = j = 0
 
         # random select one fold
-        while i == j:
-            j = random.randint(0,self.n_folds-1)
-            i = random.randint(0,self.n_folds-1)
+        # while i == j:
+        j = random.randint(0,self.n_folds-1)
+        i = random.randint(0,self.n_folds-1)
 
         # here, I allow hat_y to be max value of Y by setting self.K+1 values for hat_y
         # Need n_fold ** 2 * n_test * K models...
@@ -452,11 +454,12 @@ class TCP(BaseCP):
         Y_train_inter = self.Y_train_inter_list[j][self.T_train_inter_list[j]==T]
         n_test_inter = X_test.shape[0]
 
-        # standize X
-        scaler = preprocessing.StandardScaler().fit(X_train_obs)
-        X_train_obs = scaler.transform(X_train_obs)
-        X_train_inter = scaler.transform(X_train_inter)
-                
+        if standardize:
+            # standize X
+            scaler = preprocessing.StandardScaler().fit(X_train_obs)
+            X_train_obs = scaler.transform(X_train_obs)
+            X_train_inter = scaler.transform(X_train_inter)
+                    
         # discretize Y
         Y_train_all = np.concatenate([Y_train_obs, Y_train_inter])
 
@@ -468,7 +471,7 @@ class TCP(BaseCP):
         Y_train_obs_dis = Y_train_all_dis[:n_train_obs]
         Y_train_inter_dis = Y_train_all_dis[n_train_obs:]
 
-        # train the density ratio estimation model with discretized labels
+        # only train the density ratio estimation model with discretized labels
         D_obs = np.concatenate((X_train_obs, Y_train_obs_dis[:, None]), axis=1)
         D_inter = np.concatenate((X_train_inter, Y_train_inter_dis[:, None]), axis=1)
 
@@ -476,22 +479,24 @@ class TCP(BaseCP):
 
 
     def init_models(self, T, n_test_inter):
+        # init models for all folds
         if self.quantile_regression:
             assert(self.base_learner)
             self.models[T] = {}
+
+            # for each obs fold, inter fold, test sample, and each bin
             self.models[T]["upper"] = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.K+1)]
+                                        for _ in range(n_test_inter)] # for each test data point x each fold
+            self.models[T]["lower"] = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.K+1)]
                                         for _ in range(n_test_inter)]
-            self.models[T]["lower"] = [[base_learners_dict[self.base_learner](**self.first_CQR_args_l) for _ in range(self.K+1)]
-                                        for _ in range(n_test_inter)]
-            # raise NotImplementedError("Only support quantile_regression = False")
 
         else:
-            # for each test sample, each random split
-            self.models[T] = [[base_learners_dict[self.base_learner](**self.first_CQR_args) for _ in range(self.K+1)]
+            # for each obs fold, inter fold, test sample, and each bin
+            self.models[T] = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.K+1)]
                                         for _ in range(n_test_inter)]
-            pass
     
-    def train_density_model(self, T, D_inter, D_obs):
+    def train_density_model(self, T, D_obs, D_inter):
+        # i and j are the fold idx of the D_inter and D_obs
         if self.density_ratio_model == "DR": # density ratio estimator
 
             density_model = densratio(D_inter, D_obs, alpha=0.01)
@@ -520,85 +525,94 @@ class TCP(BaseCP):
 
         return density_model, weights_train
 
-    def predict_counterfactual(self, X_test, T=1):
+    def predict_counterfactual(self, X_test, T):
+        # self.density_models[T] = [[None for _ in range(self.n_folds)] for _ in range(self.n_folds)]
+
+        n_test_inter, _, _, _, _, _ = self.data_preproc(X_test, T)
+
+        self.init_models(T, n_test_inter)
+
+        # for i in tqdm(range(self.n_folds), desc="Processing folds"):
+        #     for j in range(self.n_folds):
+
+        y_test_min, y_test_max = self.predict_counterfactual_one_fold(X_test,T)
+
+        return y_test_min, y_test_max
+
+
+    def predict_counterfactual_one_fold(self, X_test, T):
         # Fit regression models for T=1 or T=0 on obs + inter data (x_1,y_1,...,x_M+1,y) for all y \in \mathcal{Y}
-
-        # self.density_models_0 = [[None for _ in range(self.n_folds)] for _ in range(self.n_folds)]
-
-        # need n_fold ** 2 density models
-        self.density_models = [[None for _ in range(self.n_folds)] for _ in range(self.n_folds)]
 
         y_test_min = [] # n_test
         y_test_max = [] # n_test
 
-        n_test_inter, D_obs, D_inter, X_train_obs, Y_train_obs, Y_bins = self.data_preproc(X_test,T)
+        # Y_train_obs is still continuous
+        # D_obs and D_inter have discretized Y
+        n_test_inter, D_obs, D_inter, X_train_obs, Y_train_obs, Y_bins = self.data_preproc(X_test, T)
 
-        self.init_models(T, n_test_inter)
-
-        _, weights_train = self.train_density_model(T, D_inter, D_obs)
+        _, weights_train = self.train_density_model(T, D_obs, D_inter)
 
         # save results
         y_test_min = np.zeros(n_test_inter)
         y_test_max = np.zeros(n_test_inter)
 
-        update_interval = 50 # for tqdm
+        for test_idx in range(X_test.shape[0]):
+            # loop over each test data point
 
-        with tqdm(total=X_test.shape[0]) as pbar:
+            x_test = X_test[test_idx, :]
+            X_train_test_mixed = np.concatenate((X_train_obs, x_test.reshape(1,-1)), axis=0)
+            y_interval = []
 
-            for test_idx in range(X_test.shape[0]):
-                x_test = X_test[test_idx, :]
-                X_train_test_mixed = np.concatenate((X_train_obs, x_test.reshape(1,-1)), axis=0)
-                y_interval = []
+            for k, y_hat_dis in enumerate(Y_bins):
+                # attach each possible value of discretized Y to X_test
+                D_test = np.array(np.concatenate((x_test, np.array([y_hat_dis])), axis=0)[None, :])
 
-                for k, y_hat in enumerate(Y_bins):
-                    D_test = np.array(np.concatenate((x_test, np.array([y_hat])), axis=0)[None, :])
-
-                    if self.density_ratio_model == "DR":
-                        weight_test = self.density_models[T].compute_density_ratio(D_test)
-                        
-                    elif self.density_ratio_model == "MLP":
-                        p_obs = self.density_models[T].predict_proba(D_test)[:,1]
-                        weight_test = (1-p_obs)/p_obs #TODO: double check
+                if self.density_ratio_model == "DR":
+                    weight_test = self.density_models[T].compute_density_ratio(D_test)
                     
-                    Y_train_test_mixed = np.concatenate((Y_train_obs, np.array([y_hat])), axis=0)
-                    # self.fit(X_train_test_mixed, Y_train_test_mixed, T=T)
-
-                    if self.quantile_regression:
-                        model_u = self.models[T]["upper"][test_idx][k]
-                        model_l = self.models[T]["lower"][test_idx][k]
-                        model_u.fit(X_train_test_mixed, Y_train_test_mixed)
-                        model_l.fit(X_train_test_mixed, Y_train_test_mixed)
-
-                        Y_hat_l = model_l.predict(X_train_test_mixed)
-                        Y_hat_u = model_u.predict(X_train_test_mixed)
-
-                        scores = np.maximum(
-                            Y_hat_l - Y_train_test_mixed, 
-                            Y_train_test_mixed - Y_hat_u)
-                        
-                        scores = np.maximum(scores, 0.0)
-
-                    else:
-                        model = self.models[T][test_idx][k]
-                        model.fit(X_train_test_mixed, Y_train_test_mixed)
-
-                        Y_hat = model.predict(X_train_test_mixed)
-                        scores = np.abs(Y_hat - Y_train_test_mixed)
-
-                    offset = utils.weighted_transductive_conformal(
-                        self.alpha, weights_train, weight_test, scores)
-                    
-                    print("Scores[-1]:{}, Offset:{}".format(scores[-1], offset))
-                    if scores[-1] < offset:
-                        # compare test sample score with offset
-                        # append to y_interval iff scores[-1] < offset
-                        y_interval.append(float(y_hat))
-
-                y_test_min[test_idx] = min(y_interval)
-                y_test_max[test_idx] = max(y_interval)
+                elif self.density_ratio_model == "MLP":
+                    p_obs = self.density_models[T].predict_proba(D_test)[:,1]
+                    weight_test = (1-p_obs)/p_obs #TODO: double check
                 
-                if test_idx % update_interval == 0:
-                    pbar.update(update_interval)
+                Y_train_test_mixed = np.concatenate((Y_train_obs, np.array([y_hat_dis])), axis=0)
+
+                # compute nonconf score
+                if self.quantile_regression:
+                    model_u = self.models[T]["upper"][test_idx][k]
+                    model_l = self.models[T]["lower"][test_idx][k]
+                    model_u.fit(X_train_test_mixed, Y_train_test_mixed)
+                    model_l.fit(X_train_test_mixed, Y_train_test_mixed)
+
+                    Y_hat_l = model_l.predict(X_train_test_mixed)
+                    Y_hat_u = model_u.predict(X_train_test_mixed)
+
+                    scores = np.maximum(
+                        Y_hat_l - Y_train_test_mixed, 
+                        Y_train_test_mixed - Y_hat_u)
+                    
+                    scores = np.maximum(scores, 0.0)
+
+                else:
+                    model = self.models[T][test_idx][k]
+                    model.fit(X_train_test_mixed, Y_train_test_mixed)
+
+                    Y_hat = model.predict(X_train_test_mixed)
+                    scores = np.abs(Y_hat - Y_train_test_mixed)
+
+                offset = utils.weighted_transductive_conformal(
+                    self.alpha, weights_train, weight_test, scores)
+                
+                print("Scores[-1]:{}, Offset:{}".format(scores[-1], offset))
+
+                if scores[-1] < offset:
+                    # compare test sample score with offset
+                    # append to y_interval iff scores[-1] < offset
+
+                    # TCP can only predict the discretized Y, so self.K has impacts on the performance
+                    y_interval.append(float(y_hat_dis))
+
+            y_test_min[test_idx] = min(y_interval)
+            y_test_max[test_idx] = max(y_interval)
                     
         return y_test_min, y_test_max
                 

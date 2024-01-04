@@ -243,8 +243,8 @@ def generate_data(n_observation, n_intervention, d, gamma, alpha, confouding):
 
 
 
-def IHDP_w_HC(n_intervention, seed, d=1,
-              hidden_confounding=True, beta_u=None, root="./data/IHDP"):
+def IHDP_w_HC(n_intervention:int, seed:int, d:int=24,
+              hidden_confounding=True, beta_u:float=0.5, root:str="./data/IHDP"):
     # adapted from https://github.com/anndvision/quince/blob/main/quince/library/datasets/ihdp.py
 
     """
@@ -256,7 +256,7 @@ def IHDP_w_HC(n_intervention, seed, d=1,
         mode (_type_): _description_
         seed (_type_): _description_
         hidden_confounding (_type_): _description_
-        beta_u (_type_, optional): _description_. Defaults to None.
+        beta_u (_type_, optional): strength of hidden confounding, from 0.1 to 0.5.
 
     Raises:
         NotImplementedError: _description_
@@ -328,16 +328,21 @@ def IHDP_w_HC(n_intervention, seed, d=1,
     beta_x = rng.choice(
         [0.0, 0.1, 0.2, 0.3, 0.4], size=(24,), p=[0.6, 0.1, 0.1, 0.1, 0.1]
     )
-    beta_u = (
-        rng.choice(
-            [0.1, 0.2, 0.3, 0.4, 0.5], size=(1,), p=[0.2, 0.2, 0.2, 0.2, 0.2]
-        )
-        if beta_u is None
-        else np.asarray([beta_u])
-    )
 
+    # beta_u = (
+    #     rng.choice(
+    #         [0.1, 0.2, 0.3, 0.4, 0.5], size=(1,), p=[0.2, 0.2, 0.2, 0.2, 0.2]
+    #     )
+    #     if beta_u is None
+    #     else np.asarray([beta_u])
+    # )
+
+    beta_u = np.asarray([beta_u])
+
+    # mu0 is exponential (harder)
     mu0 = np.exp((x + 0.5).dot(beta_x) + (u + 0.5).dot(beta_u))
     df["mu0"] = mu0
+    # mu1 is linear
     mu1 = (x + 0.5).dot(beta_x) + (u + 0.5).dot(beta_u)
     omega = (mu1[t == 1] - mu0[t == 1]).mean(0) - 4
     mu1 -= omega

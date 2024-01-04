@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import time
 
+
+
 def split_data(data, n_folds, frac):
     X_train_list, T_train_list, Y_train_list = [], [], []
     X_calib_list, T_calib_list, Y_calib_list = [], [], []
@@ -110,11 +112,11 @@ def standard_conformal(alpha, scores):
     return offset
 
 
-def save_results(args, res, n_intervention):
+def save_results(args, res, n_intervention, cur_time):
     res['n_intervention'] = n_intervention
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     
-    run_name = f"{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_seed_{args.seed}"
+    run_name = f"{cur_time}_{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_seed_{args.seed}"
 
     folder_name = os.path.join(args.save_path,args.dataset) #local path
     if not os.path.isdir(folder_name):
