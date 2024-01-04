@@ -11,7 +11,7 @@ def get_config():
     parser = argparse.ArgumentParser(description='Transductive Conformal Prediction')
 
     # Data settings
-    parser.add_argument('--seed', type=int, default=None)
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--save_path', type=str, default='./results')
     parser.add_argument('--debug', type=bool, default=True)
     parser.add_argument('--dataset', type=str, default='ihdp')
@@ -24,13 +24,16 @@ def get_config():
     # parser.add_argument('--output_folder', type=str, default=None) # keep it as None for local exp
 
     # Model settings
-    parser.add_argument('--methods', type=list, default=['exact', 'inexact', 'naive', 'weighted CP'
+    parser.add_argument('--methods', type=list, default=['TCP', 'exact', 'inexact', 'naive', 'weighted CP'
                                                           ])
     parser.add_argument('--base_learner', type=str, default="GBM")
     parser.add_argument('--density_ratio_model', type=str, default="MLP")
     parser.add_argument('--n_estimators', type=int, default=20)
     parser.add_argument('--quantile_regression', type=bool, default=True, 
                         help="True for quantile regression, False for normal regression")
+    
+    # TCP
+    parser.add_argument('--n_Y_bins', type=int, default=10)
 
     args = parser.parse_args()
 
@@ -148,7 +151,8 @@ def main(args):
                             method = 'TCP',
                             density_ratio_model=args.density_ratio_model,
                             base_learner=args.base_learner,
-                            n_estimators=args.n_estimators)
+                            n_estimators=args.n_estimators,
+                            K=args.n_Y_bins)
         
         utils.save_results(args, res, n_intervention, cur_time)
 

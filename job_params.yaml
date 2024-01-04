@@ -1,10 +1,13 @@
 # 对于所有的参数类型，可以参考这里
 # 模板的参数
 params:
-  - name: dataset
-    value: 'ihdp'
-  - name: output_folder
-    value: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
+  # - name: dataset
+  #   value: 'ihdp'
+  # - name: output_folder
+  #   value: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
+  - name: n_intervention
+     multi_value: [100, 200, 300, 400, 500]
+
  
 # 对于所有的输入输出类型，可以参考这里
 # 模板的输入
