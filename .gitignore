@@ -19,6 +19,7 @@ wandb/
 data/
 .vscode/
 arnold/
+post_proc/
 
 data/__pycache__/*
 models/__pycache__/*

@@ -5,7 +5,7 @@ from data.datasets import *
 from models.methods import run_conformal, weighted_conformal_prediction
 from models import utils
 from datetime import datetime
-
+import random
 
 def get_config():
     parser = argparse.ArgumentParser(description='Transductive Conformal Prediction')
@@ -43,6 +43,8 @@ def main(args):
     # Get the current time
     current_time = datetime.now()
     cur_time = current_time.strftime("%m-%d")
+    # Generating a 4 digit random integer to avoid fn collision
+    random_number = random.randint(1000, 9999)
 
     args = utils.preprocess(args)
     np.random.seed(args.seed)
@@ -99,7 +101,7 @@ def main(args):
                             target="counterfactual",
                             method = 'naive')
         
-        utils.save_results(args, res, n_intervention, cur_time)
+        utils.save_results(args, res, n_intervention, cur_time, random_number)
 
     if 'inexact' in args.methods:
         res = run_conformal(
@@ -112,7 +114,7 @@ def main(args):
                             target="counterfactual",
                             method = 'inexact')
         
-        utils.save_results(args, res, n_intervention, cur_time)
+        utils.save_results(args, res, n_intervention, cur_time, random_number)
 
     if 'exact' in args.methods:
 
@@ -126,7 +128,7 @@ def main(args):
                             target="counterfactual",
                             method = 'exact')
         
-        utils.save_results(args, res, n_intervention, cur_time)
+        utils.save_results(args, res, n_intervention, cur_time, random_number)
 
 
     if 'weighted CP' in args.methods:
@@ -137,7 +139,7 @@ def main(args):
                                         target="counterfactual",
                                         method='weighted CP')
         
-        utils.save_results(args, res, n_intervention, cur_time)
+        utils.save_results(args, res, n_intervention, cur_time, random_number)
 
     if 'TCP' in args.methods:
         res = run_conformal(
@@ -154,7 +156,7 @@ def main(args):
                             n_estimators=args.n_estimators,
                             K=args.n_Y_bins)
         
-        utils.save_results(args, res, n_intervention, cur_time)
+        utils.save_results(args, res, n_intervention, cur_time, random_number)
 
         # coverage, average_interval_width, PEHE, conformity_scores = conformal_metalearner(df_o, 
         #                                                                                 metalearner="DR", 

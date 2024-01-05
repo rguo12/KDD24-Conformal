@@ -111,12 +111,9 @@ def standard_conformal(alpha, scores):
     return offset
 
 
-def save_results(args, res, n_intervention, cur_time):
+def save_results(args, res, n_intervention, cur_time, random_number):
     res['n_intervention'] = n_intervention
     res['beta_u'] = args.beta_u
-
-    # Generating a 4 digit random integer to avoid fn collision
-    random_number = random.randint(1000, 9999)
 
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     
