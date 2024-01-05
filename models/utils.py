@@ -8,8 +8,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 import numpy as np
 import pandas as pd
 import time
-
-
+import random
 
 def split_data(data, n_folds, frac):
     X_train_list, T_train_list, Y_train_list = [], [], []
@@ -115,10 +114,13 @@ def standard_conformal(alpha, scores):
 def save_results(args, res, n_intervention, cur_time):
     res['n_intervention'] = n_intervention
     res['beta_u'] = args.beta_u
-    
+
+    # Generating a 4 digit random integer to avoid fn collision
+    random_number = random.randint(1000, 9999)
+
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     
-    run_name = f"{cur_time}_{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_n_Y_bins_{args.n_Y_bins}_seed_{args.seed}"
+    run_name = f"{cur_time}_{random_number}_{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_n_Y_bins_{args.n_Y_bins}_seed_{args.seed}"
 
     folder_name = os.path.join(args.save_path,args.dataset) #local path
     if not os.path.isdir(folder_name):
