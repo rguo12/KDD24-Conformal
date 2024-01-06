@@ -9,6 +9,8 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from quantile_forest import RandomForestQuantileRegressor
 from sklearn import preprocessing
+from sklearn.base import clone
+from joblib import Parallel, delayed
 # import density_ratio_estimation.src.densityratio as densityratio
 from densratio import densratio
 # from concurrent.futures import ProcessPoolExecutor
@@ -591,52 +593,42 @@ class TCP(BaseCP):
         y_test_min = np.zeros(n_test)
         y_test_max = np.zeros(n_test)
 
+        model_u = base_learners_dict[self.base_learner](**self.first_CQR_args_u)
+        model_l = base_learners_dict[self.base_learner](**self.first_CQR_args_l)
+
         for test_idx in tqdm(range(X_test.shape[0])):
             x_test = X_test[test_idx, :][None, :]
             X_aug = np.concatenate((self.X_obs_data[f'{T}'], x_test), axis=0)
             y_interval = []
 
-            for y_hat in self.Y_hat:
-                D_test = np.concatenate((x_test, np.array([y_hat])[:, None]), axis=1)
+            def fit_model(y):
+                Y_aug = np.concatenate((self.Y_obs_data[f'{T}'], np.array([y])), axis=0)
+                model_u_ = clone(model_u)
+                model_u_.fit(X_aug, Y_aug)
+                model_l_ = clone(model_l)
+                model_l_.fit(X_aug, Y_aug)
 
-                if self.density_ratio_model == "DR":
-                    weight_test = density_model.compute_density_ratio(D_test)
-                    
-                elif self.density_ratio_model == "MLP":
-                    p_obs = density_model.predict_proba(D_test)[:,1]
-                    weight_test = (1-p_obs)/p_obs #TODO: double check
-                
-                Y_aug = np.concatenate((self.Y_obs_data[f'{T}'], np.array([y_hat])), axis=0)
+                Y_hat_l = model_l_.predict(X_aug)
+                Y_hat_u = model_u_.predict(X_aug)
+                scores = np.maximum(Y_hat_l - Y_aug, Y_aug - Y_hat_u)
 
-                if self.quantile_regression:
-                    model_u = self.models[T]["upper"]
-                    model_l = self.models[T]["lower"]
-                    model_u.fit(X_aug, Y_aug)
-                    model_l.fit(X_aug, Y_aug)
-
-                    Y_hat_l = model_l.predict(X_aug)
-                    Y_hat_u = model_u.predict(X_aug)
-
-                    scores = np.maximum(Y_hat_l - Y_aug, Y_aug - Y_hat_u)
-                    
-                else:
-                    model = self.models[T]
-                    model.fit(X_aug, Y_aug)
-
-                    Y_hat = model.predict(X_aug)
-                    scores = np.abs(Y_hat - Y_aug)
-
+                D_test = np.concatenate((x_test, np.array([y])[:, None]), axis=1)
+                p_obs = density_model.predict_proba(D_test)[:,1]
+                weight_test = (1. - p_obs) / p_obs #TODO: double check
                 offset = utils.weighted_transductive_conformal(
                     self.alpha, weights_train, weight_test, scores)
-                
-                # print("Scores:{}, Offset:{}".format(scores[-1], offset))
-                if scores[-1] < offset:
+                return offset, scores[-1]
+
+            # Parallelization
+            results = Parallel(n_jobs=self.n_estimators)(delayed(fit_model)(y) for y in self.Y_hat)
+            for i, y_hat in enumerate(self.Y_hat):
+                if results[i][1] < results[i][0]:
                     y_interval.append(y_hat)
 
             y_test_min[test_idx] = min(y_interval)
             y_test_max[test_idx] = max(y_interval)
 
-            print(f"Interval is from {y_test_min[test_idx]} to {y_test_max[test_idx]}.") 
+            # print(f"Interval is from {y_test_min[test_idx]} to {y_test_max[test_idx]}.") 
 
             pause = True
         return y_test_min, y_test_max

@@ -16,11 +16,12 @@ def get_config():
     # parser.add_argument('--output_folder', type=str, default=None) # keep it as None for local exp
 
     # Model settings
-    parser.add_argument('--methods', type=list, default=['TCP'])
+    # parser.add_argument('--methods', type=list, default=['TCP'])
+    parser.add_argument('--methods', type=list, default=['naive', 'TCP'])
 
     parser.add_argument('--base_learner', type=str, default="GBM")
     parser.add_argument('--density_ratio_model', type=str, default="MLP")
-    parser.add_argument('--n_estimators', type=int, default=20)
+    parser.add_argument('--n_estimators', type=int, default=50)
     parser.add_argument('--quantile_regression', type=bool, default=True, 
                         help="True for quantile regression, False for normal regression")
 
@@ -32,7 +33,8 @@ def main(args):
     args = utils.preprocess(args)
     np.random.seed(args.seed)
     n_observation = 10000
-    n_intervention_list = np.arange(100, 1000, 100)
+    # n_intervention_list = np.arange(100, 1000, 100)
+    n_intervention_list = [100]
     d = 10
 
     alpha = 0.1
