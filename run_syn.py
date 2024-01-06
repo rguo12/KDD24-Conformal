@@ -12,12 +12,11 @@ def get_config():
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--save_path', type=str, default='./results')
     parser.add_argument('--debug', type=bool, default=True)
-    parser.add_argument('--dataset', type=str, default='ihdp')
+    parser.add_argument('--dataset', type=str, default='synthetic')
     # parser.add_argument('--output_folder', type=str, default=None) # keep it as None for local exp
 
     # Model settings
-    parser.add_argument('--methods', type=list, default=['naive', 'inexact', 'exact', 'weighted CP', 'TCP'
-                                                          ])
+    parser.add_argument('--methods', type=list, default=['TCP'])
 
     parser.add_argument('--base_learner', type=str, default="GBM")
     parser.add_argument('--density_ratio_model', type=str, default="MLP")
@@ -37,8 +36,8 @@ def main(args):
     d = 10
 
     alpha = 0.1
-    test_frac = 0.5 # n_observation * (1. - test_frac) is the real n_observation
-    n_folds = 5
+    test_frac = 0.001 # n_observation * (1. - test_frac) is the real n_observation
+    n_folds = 3
     err_scale = 0.1
 
     # df_train, df_test = generate_lilei_hua_data()
@@ -85,7 +84,7 @@ def main(args):
                                 target="counterfactual",
                                 method = 'naive')
             
-            utils.save_results(args, res, n_intervention)
+            utils.save_results(args, res, n_intervention, n_observation)
 
         if 'inexact' in args.methods:
             res = run_conformal(
@@ -98,7 +97,7 @@ def main(args):
                                 target="counterfactual",
                                 method = 'inexact')
             
-            utils.save_results(args, res, n_intervention)
+            utils.save_results(args, res, n_intervention, n_observation)
 
         if 'exact' in args.methods:
 
@@ -112,7 +111,7 @@ def main(args):
                                 target="counterfactual",
                                 method = 'exact')
             
-            utils.save_results(args, res, n_intervention)
+            utils.save_results(args, res, n_intervention, n_observation)
 
 
         if 'weighted CP' in args.methods:
@@ -123,7 +122,7 @@ def main(args):
                                             target="counterfactual",
                                             method='weighted CP')
             
-            utils.save_results(args, res, n_intervention)
+            utils.save_results(args, res, n_intervention, n_observation)
 
         if 'TCP' in args.methods:
             res = run_conformal(
@@ -139,7 +138,7 @@ def main(args):
                                 base_learner=args.base_learner,
                                 n_estimators=args.n_estimators)
             
-            utils.save_results(args, res, n_intervention)
+            utils.save_results(args, res, n_intervention, n_observation)
 
         # coverage, average_interval_width, PEHE, conformity_scores = conformal_metalearner(df_o, 
         #                                                                                 metalearner="DR", 

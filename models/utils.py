@@ -110,8 +110,9 @@ def standard_conformal(alpha, scores):
     return offset
 
 
-def save_results(args, res, n_intervention):
+def save_results(args, res, n_intervention, n_observation):
     res['n_intervention'] = n_intervention
+    res['n_observation'] = n_observation
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     
     run_name = f"{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_seed_{args.seed}"
@@ -126,13 +127,15 @@ def save_results(args, res, n_intervention):
     print(f"saving results to {fn}")
     
     if not os.path.exists(fn):
+        os.makedirs(os.path.dirname(fn), exist_ok=True)
         df.to_csv(fn)
     else:
         df.to_csv(fn, mode='a', header=False)
     
     if args.debug:
-        print(f"Weighted conformal prediction ({res['method']})")
+        print(f"Conformal prediction ({res['method']})")
         print("Number of intervention data", n_intervention)
+        print("Number of observation data", n_observation)
         print('Coverage of Y(0)', res['coverage_0'])
         print('Interval width of Y(0)', res['interval_width_0'])
         print('Coverage of Y(1)', res['coverage_1'])
