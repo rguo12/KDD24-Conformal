@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 import numpy as np
 import pandas as pd
 import time
+import random
 
 def split_data(data, n_folds, frac):
     X_train_list, T_train_list, Y_train_list = [], [], []
@@ -115,12 +116,11 @@ def save_results(args, res, n_intervention, n_observation):
     res['n_observation'] = n_observation
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     
-    run_name = f"{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_seed_{args.seed}"
+    run_name = f"{cur_time}_{random_number}_{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_n_Y_bins_{args.n_Y_bins}_seed_{args.seed}"
 
-    # if args.output_folder is None:
     folder_name = os.path.join(args.save_path,args.dataset) #local path
-    # else:
-    # folder_name = os.path.join(args.output_folder,args.dataset)
+    if not os.path.isdir(folder_name):
+        os.mkdir(folder_name)
 
     fn = os.path.join(folder_name,f'{run_name}.csv')
 

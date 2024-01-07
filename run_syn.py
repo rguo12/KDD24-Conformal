@@ -4,12 +4,14 @@ import argparse
 from data.datasets import *
 from models.methods import run_conformal, weighted_conformal_prediction
 from models import utils
+from datetime import datetime
+import random
 
 def get_config():
     parser = argparse.ArgumentParser(description='Transductive Conformal Prediction')
 
     # Data settings
-    parser.add_argument('--seed', type=int, default=None)
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--save_path', type=str, default='./results')
     parser.add_argument('--debug', type=bool, default=True)
     parser.add_argument('--dataset', type=str, default='synthetic')
@@ -24,12 +26,21 @@ def get_config():
     parser.add_argument('--n_estimators', type=int, default=50)
     parser.add_argument('--quantile_regression', type=bool, default=True, 
                         help="True for quantile regression, False for normal regression")
+    
+    # TCP
+    parser.add_argument('--n_Y_bins', type=int, default=10)
 
     args = parser.parse_args()
 
     return args
 
 def main(args):
+    # Get the current time
+    current_time = datetime.now()
+    cur_time = current_time.strftime("%m-%d")
+    # Generating a 4 digit random integer to avoid fn collision
+    random_number = random.randint(1000, 9999)
+
     args = utils.preprocess(args)
     np.random.seed(args.seed)
     n_observation = 10000
@@ -51,28 +62,16 @@ def main(args):
     # df_o = [df_train, df_test]
 
 
-    for n_intervention in n_intervention_list:
+    # for n_intervention in n_intervention_list:
+    n_intervention = args.n_intervention
         
-        if args.dataset == 'synthetic':
-            df_o, df_i = generate_data(n_observation=n_observation,    
-                                n_intervention=n_intervention,
-                                d=d, 
-                                gamma=0.5, 
-                                alpha=alpha,
-                                confouding=True)
-            
-        elif args.dataset == 'cevae':
-            df_o, df_i = generate_cevae_data(n_observation, n_intervention, err_scale = err_scale)
-
-
-        elif args.dataset == 'ihdp':
-            # as ihdp is a small dataset w. 740+ samples
-            # we only allow the n_intervention to be no larger than 500
-
-            if n_intervention > 500:
-                break
-            df_o, df_i = IHDP_w_HC(n_intervention, args.seed, d=24,
-              hidden_confounding=True, beta_u=None, root="data/IHDP")
+    if args.dataset == 'synthetic':
+        df_o, df_i = generate_data(n_observation=n_observation,    
+                            n_intervention=n_intervention,
+                            d=d, 
+                            gamma=0.5, 
+                            alpha=alpha,
+                            confouding=True)
         
         # naive baseline
         if 'naive' in args.methods:
@@ -101,7 +100,18 @@ def main(args):
             
             utils.save_results(args, res, n_intervention, n_observation)
 
-        if 'exact' in args.methods:
+    if 'inexact' in args.methods:
+        res = run_conformal(
+                            df_o,
+                            df_i,
+                            quantile_regression=True,
+                            n_folds=n_folds,
+                            alpha=alpha,
+                            test_frac=test_frac,
+                            target="counterfactual",
+                            method = 'inexact')
+        
+        utils.save_results(args, res, n_intervention, cur_time, random_number)
 
             res = run_conformal(
                                 df_o,

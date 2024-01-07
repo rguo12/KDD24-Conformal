@@ -33,7 +33,7 @@ class BaseCP:
     
     def __init__(self, data_obs, data_inter, n_folds,
                  alpha=0.1, base_learner="RF", 
-                 quantile_regression=True, n_estimators : int = 10):
+                 quantile_regression=True, n_estimators : int = 10, calib_frac=0.25):
 
         """
         Base class for conformal prediction, including transductive and split naive, inexact and exact.
@@ -121,7 +121,7 @@ class SplitCP(BaseCP):
         """
         Fits the plug-in models and meta-learners using the sample (X, W, Y) and true propensity scores pscores
         """
-        if method == 'two_stage_inexact' or method == 'two_stage_exact':
+        if method in ['two_stage_inexact', 'two_stage_exact']:
             self.models_u_0 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
             self.models_l_0 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_l) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
             self.models_u_1 = [[base_learners_dict[self.base_learner](**self.first_CQR_args_u) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
@@ -143,6 +143,8 @@ class SplitCP(BaseCP):
                 Y_train_inter_1 = self.Y_train_inter_list[j][self.T_train_inter_list[j]==1]
 
                 for i in tqdm(range(self.n_folds)):
+                    # i == j is okay as obs and inter data are different
+
                     X_train_obs_0 = self.X_train_obs_list[i][self.T_train_obs_list[i]==0, :]
                     Y_train_obs_0 = self.Y_train_obs_list[i][self.T_train_obs_list[i]==0]
                     X_train_obs_1 = self.X_train_obs_list[i][self.T_train_obs_list[i]==1, :]
