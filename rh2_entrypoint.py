@@ -25,13 +25,14 @@ env = get_rh2_env()
 dataset = env.params.dataset
 output_folder = env.params.output_folder
 
-n_intervention = env.params.n_intervention
-beta_u = env.params.beta_u
+n_inter_max = env.params.n_inter_max
+n_obs = env.params.n_obs
+# beta_u = env.params.beta_u
 n_estimators= env.params.n_estimators
 base_learner = env.params.base_learner
 density_ratio_model = env.params.density_ratio_model
 quantile_regression = env.params.quantile_regression
-n_Y_bins = env.params.n_Y_bins
+# n_Y_bins = env.params.n_Y_bins
 
 # local_save_path = "/mnt/bn/confrank2/causal_TCP/results/"
 subprocess.call('''cd causal_TCP''', shell=True)
@@ -46,8 +47,8 @@ print(f"output folder is {output_folder}")
 # cmd = f'''python3 run_syn.py --dataset={dataset} --save_path={local_save_path}'''
 cmd = f'''python3 run_syn.py --dataset={dataset} \
         --save_path={local_save_path} \
-        --n_intervention={n_intervention} \
-        --beta_u={beta_u} \
+        --n_inter_max={n_inter_max} \
+        --n_obs={n_obs} \
         --n_estimators={n_estimators} \
         --base_learner={base_learner} \
         --density_ratio_model={density_ratio_model} \

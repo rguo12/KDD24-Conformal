@@ -1,8 +1,8 @@
 # 对于所有的参数类型，可以参考这里
 # 模板的参数
-params:
-  name: n_intervention
-  value: 300
+# params:
+#   name: n_intervention
+#   value: 300
  
 # 对于所有的输入输出类型，可以参考这里
 # 模板的输入
