@@ -116,7 +116,7 @@ def save_results(args, res, n_intervention, n_observation, cur_time, random_numb
     res['n_observation'] = n_observation
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     
-    run_name = f"{random_number}_{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_n_Y_bins_{args.n_Y_bins}_seed_{args.seed}"
+    run_name = f"{random_number}_{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_seed_{args.seed}"
 
     folder_name = os.path.join(args.save_path,args.dataset,cur_time) #local path
     if not os.path.isdir(folder_name):
