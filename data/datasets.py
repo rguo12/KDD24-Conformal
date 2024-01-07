@@ -442,7 +442,7 @@ def generate_cevae_data(n_observation, n_intervention, d=1, err_scale=0.1, ps_st
 
 
 
-def generate_lilei_hua_data():
+def generate_leihua_li_data():
 
     # Replicate the demo from https://lihualei71.github.io/cfcausal/articles/cfcausal_demo.html
     np.random.seed(2020)

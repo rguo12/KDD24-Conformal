@@ -497,6 +497,7 @@ class TCP(BaseCP):
         self.Y_obs_data['0'] = Y_obs[T_obs==0]
         self.Y_obs_data['1'] = Y_obs[T_obs==1]
 
+        # now, Y_bins = n_estimators
         self.Y_hat = np.linspace(np.min(Y_inter), np.max(Y_inter), n_estimators)
 
     # def data_preproc(self, X_test, T):
