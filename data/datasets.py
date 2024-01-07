@@ -145,7 +145,7 @@ def NLSM_data():
     return dataset
 
 
-def generate_data(n_observation, n_intervention, d, gamma, alpha, confouding):
+def generate_data(n_observation, n_intervention, d, gamma, alpha, confounding):
     
     def correlated_covariates(n, d):
         rho = 0.9
@@ -158,7 +158,7 @@ def generate_data(n_observation, n_intervention, d, gamma, alpha, confouding):
     
     X = np.random.uniform(size=(n_observation, d)) # d-dimensional Uniform random variable X
 
-    if confouding:
+    if confounding:
         # d-dimensional normal random variable U
         U = np.abs(np.random.normal(0., 1. , size=(n_observation, d)))
         
@@ -204,7 +204,7 @@ def generate_data(n_observation, n_intervention, d, gamma, alpha, confouding):
     # Generate intervention data
     X = np.random.uniform(size=(n_intervention, d))
 
-    if confouding:
+    if confounding:
         U = np.abs(np.random.normal(0., 1. , size=(n_intervention, d)))
         tau = (2 / (1 + np.exp(-12 * ((U[:, 0] + U[:, 0]) / 2 - 0.5)))) * (2 / (1 + np.exp(-12 * ((U[:, 1] + U[:, 1]) / 2 - 0.5)))) 
         tau = tau.reshape((-1,))
@@ -342,6 +342,7 @@ def IHDP_w_HC(n_intervention:int, seed:int, d:int=24,
     # mu0 is exponential (harder)
     mu0 = np.exp((x + 0.5).dot(beta_x) + (u + 0.5).dot(beta_u))
     df["mu0"] = mu0
+    
     # mu1 is linear
     mu1 = (x + 0.5).dot(beta_x) + (u + 0.5).dot(beta_u)
     omega = (mu1[t == 1] - mu0[t == 1]).mean(0) - 4

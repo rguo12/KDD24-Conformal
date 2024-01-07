@@ -16,7 +16,7 @@ commands
 *.pyc
 
 wandb/
-data/
+data/IHDP
 .vscode/
 arnold/
 post_proc/

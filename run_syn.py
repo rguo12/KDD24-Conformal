@@ -14,7 +14,7 @@ def get_config():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--save_path', type=str, default='./results')
     parser.add_argument('--debug', type=bool, default=True)
-    parser.add_argument('--dataset', type=str, default='ihdp')
+    parser.add_argument('--dataset', type=str, default='cevae')
     parser.add_argument('--n_folds', type=int, default=5)
     parser.add_argument('--n_intervention', type=int, default=100)
 
@@ -117,7 +117,6 @@ def main(args):
         utils.save_results(args, res, n_intervention, cur_time, random_number)
 
     if 'exact' in args.methods:
-
         res = run_conformal(
                             df_o,
                             df_i,
