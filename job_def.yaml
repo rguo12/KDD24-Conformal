@@ -1,14 +1,35 @@
-icm_image: lab.pytorch:latest
+image: ''
+resProfiles: []
+apt: []
+paramGroups: []
 gitRepo:
   branchName: rc_dev1
   mnt: /opt/tiger/causal_TCP
   repoName: ai-lab-london/causal_TCP
+  commitSha: 48456d123ff5ddd9f1d65e6b329e60966e06dbac
+  tag: ''
+pip: []
+imageMeta:
+  imageVid: cl688abc77u8sgmp2lcg
+  imageUrl: ''
+  imageSid: ''
+  taskId: 0
+  imageSource: vid
+  needBuild: false
+pip3:
+  - quantile_forest
+  - scikit-learn
+  - scipy
+  - pandas
+  - quantile_forest
+  - pyreadr
+  - densratio
 params:
   - arrayItemParams: {}
     multiDefaultValue: []
     name: dataset
     isAdvance: false
-    defaultValue: 'ihdp'
+    defaultValue: ihdp
     required: false
     allowCustom: false
     hideParamByDefault: false
@@ -20,7 +41,7 @@ params:
     multiDefaultValue: []
     name: output_folder
     isAdvance: false
-    defaultValue: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
+    defaultValue: /home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/
     required: false
     allowCustom: false
     hideParamByDefault: false
@@ -28,49 +49,84 @@ params:
     selectOptions: []
     type: STRING
     hintMsg: path for output results
-# inputs:
-  # - opt: false
-  #   name: train_dataset
-  #   variableLength: false
-  #   subtype: ''
-  #   creationParams:
-  #     photonxStorage: hdfs
-  #     photonxType: image_cls
-  #   type: PHOTONX_DATASET
-  #   hintMsg: 训练集
-  # - opt: false
-  #   name: test_dataset
-  #   variableLength: false
-  #   subtype: ''
-  #   creationParams:
-  #     photonxStorage: hdfs
-  #     photonxType: image_cls
-  #   type: PHOTONX_DATASET
-  #   hintMsg: 测试集
-# outputs:
-#   - opt: True
-#     name: output_folder
-#     variableLength: false
-#     defaultValue: '/home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/'
-#     # subtype: ''
-#     # creationParams:
-#     #   photonxStorage: ''
-#     #   photonxType: ''
-#     # type: STR
-#     hintMsg: hdfs folder to save results
-entryPoint: /opt/tiger/causal_TCP/rh2_entrypoint.py
+env: {}
+mlxCommandScript: ''
+scms: []
+engineScript: ''
+inputs: []
+entrypointMode: FULL_SCRIPT
+outputs: []
+defaultResProfileTitle: ''
+subRepos: []
+icmImage: ''
 lazyDownloadCode: true
+paramBinders: {}
 resource:
+  cpu: 1
+  memory: 1024
+  gpu: 0
+  gpuType: NONE
   arnoldConfig:
-    cluster_name: 'cloudnative-lq'
-    group_names: ['LITG']
+    useTensorboard: false
+    reminderInterval: 0
+    roleImages: []
+    hybrid: false
+    retryTimes: 0
+    clusterId: 20 #hl
+    enableRayOnArnold: false
+    queuePriority: 0
+    resSchedulingPolicy: ''
+    clusterSlice: ''
+    buildRegion: ''
+    profiler: ''
+    keepMins: 0
+    bytenasVolumes:
+      - accessMode: RW
+        name: confrank2
+        roles: []
+    batchSize: 0
+    multipleMachine: false
+    assignHosts: []
+    multiResourcePool: false
+    ckptTrialId: 0
+    quotaPool: default
+    useTenantQuota: false
+    tags: []
+    clusterName: ''
+    preemptible: false
+    groupNames: []
+    enableRay: false
+    bytedriveVolumes: []
+    batchServer: false
+    maskHosts: []
+    queueTimeoutReminder: 0
     roles:
-      - name: worker
+      - resourcePool: ''
+        numElastic: 0
+        name: worker
+        preemptible: false
+        ports: 0
         num: 1
         memory: 8192
         gpu: 0
+        disk: 0
         gpuv: NONE
         cpu: 20
+    gpuType: NONE
+    groupIds:
+      - 57
+    protectHours: 0
+    elasticTraining:
+      openGangScheduler: false
+      quotaPool: ''
+      isOpen: false
+    idc: ''
   backend: ARNOLD
-name: my_test.causal_TCP # 你的模板名称, 整站全局唯一
+name: my_test.causal_TCP
+codeRepoVersionNum: 0
 pythonVersion: PYTHON3
+resProfileComments: ''
+codeRepoName: ''
+entrypointFullScript: python3 /opt/tiger/causal_TCP/rh2_entrypoint.py
+entryPoint: ''
+arnoldTaskId: '5390104'
