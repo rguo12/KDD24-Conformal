@@ -40,6 +40,10 @@ subprocess.call('''cd causal_TCP''', shell=True)
 local_save_path = "./results/"
 if not os.path.exists(local_save_path):
     os.mkdir(local_save_path)
+local_save_path = os.path.join(local_save_path,dataset)
+if not os.path.exists(local_save_path):
+    os.mkdir(local_save_path)
+
 print(f"output folder is {output_folder}")
 
 # train code
