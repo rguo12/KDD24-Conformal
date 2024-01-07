@@ -14,12 +14,12 @@ def get_config():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--save_path', type=str, default='./results')
     parser.add_argument('--debug', type=bool, default=True)
-    parser.add_argument('--dataset', type=str, default='ihdp')
+    parser.add_argument('--dataset', type=str, default='synthetic')
     parser.add_argument('--n_folds', type=int, default=5)
     parser.add_argument('--n_intervention', type=int, default=100)
 
     # ihdp hidden conf strength
-    parser.add_argument('--beta_u', type=float, default=0.5)
+    parser.add_argument('--conf_strength', type=float, default=0.5)
 
     # parser.add_argument('--output_folder', type=str, default=None) # keep it as None for local exp
 
@@ -75,36 +75,25 @@ def main(args):
         df_o, df_i = generate_data(n_observation=n_observation,    
                             n_intervention=n_intervention,
                             d=d, 
-                            gamma=0.5, 
+                            gamma=args.conf_strength, 
                             alpha=alpha,
-                            confouding=True)
+                            confounding=True)
+    else:
+        raise ValueError('select a dataset from [synthetic]')
         
-        # naive baseline
-        if 'naive' in args.methods:
-            res = run_conformal(
-                                df_o,
-                                df_i,
-                                quantile_regression=True,
-                                n_folds=n_folds,
-                                alpha=alpha,
-                                test_frac=test_frac,
-                                target="counterfactual",
-                                method = 'naive')
-            
-            utils.save_results(args, res, n_intervention, n_observation)
-
-        if 'inexact' in args.methods:
-            res = run_conformal(
-                                df_o,
-                                df_i,
-                                quantile_regression=True,
-                                n_folds=n_folds,
-                                alpha=alpha,
-                                test_frac=test_frac,
-                                target="counterfactual",
-                                method = 'inexact')
-            
-            utils.save_results(args, res, n_intervention, n_observation)
+    # naive baseline
+    if 'naive' in args.methods:
+        res = run_conformal(
+                            df_o,
+                            df_i,
+                            quantile_regression=True,
+                            n_folds=n_folds,
+                            alpha=alpha,
+                            test_frac=test_frac,
+                            target="counterfactual",
+                            method = 'naive')
+        
+        utils.save_results(args, res, n_intervention, n_observation, cur_time, random_number)
 
     if 'inexact' in args.methods:
         res = run_conformal(
@@ -117,7 +106,7 @@ def main(args):
                             target="counterfactual",
                             method = 'inexact')
         
-        utils.save_results(args, res, n_intervention, cur_time, random_number)
+        utils.save_results(args, res, n_intervention, cur_time, random_number, cur_time, random_number)
 
     if 'exact' in args.methods:
 
@@ -131,34 +120,34 @@ def main(args):
                             target="counterfactual",
                             method = 'exact')
         
-        utils.save_results(args, res, n_intervention, cur_time, random_number)
+        utils.save_results(args, res, n_intervention, cur_time, random_number, cur_time, random_number)
 
 
-        if 'weighted CP' in args.methods:
-            res = weighted_conformal_prediction(df_o, 
-                                            quantile_regression=True, 
-                                            alpha=alpha, 
-                                            test_frac=test_frac,
-                                            target="counterfactual",
-                                            method='weighted CP')
-            
-            utils.save_results(args, res, n_intervention, n_observation)
+    if 'weighted CP' in args.methods:
+        res = weighted_conformal_prediction(df_o, 
+                                        quantile_regression=True, 
+                                        alpha=alpha, 
+                                        test_frac=test_frac,
+                                        target="counterfactual",
+                                        method='weighted CP')
+        
+        utils.save_results(args, res, n_intervention, n_observation, cur_time, random_number)
 
-        if 'TCP' in args.methods:
-            res = run_conformal(
-                                df_o,
-                                df_i,
-                                quantile_regression=args.quantile_regression, # QR not implemented yet
-                                n_folds=n_folds,
-                                alpha=alpha,
-                                test_frac=test_frac,
-                                target="counterfactual",
-                                method = 'TCP',
-                                density_ratio_model=args.density_ratio_model,
-                                base_learner=args.base_learner,
-                                n_estimators=args.n_estimators)
-            
-            utils.save_results(args, res, n_intervention, n_observation)
+    if 'TCP' in args.methods:
+        res = run_conformal(
+                            df_o,
+                            df_i,
+                            quantile_regression=args.quantile_regression, # QR not implemented yet
+                            n_folds=n_folds,
+                            alpha=alpha,
+                            test_frac=test_frac,
+                            target="counterfactual",
+                            method = 'TCP',
+                            density_ratio_model=args.density_ratio_model,
+                            base_learner=args.base_learner,
+                            n_estimators=args.n_estimators)
+        
+        utils.save_results(args, res, n_intervention, n_observation, cur_time, random_number)
 
         # coverage, average_interval_width, PEHE, conformity_scores = conformal_metalearner(df_o, 
         #                                                                                 metalearner="DR", 

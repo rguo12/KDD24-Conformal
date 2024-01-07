@@ -111,7 +111,7 @@ def standard_conformal(alpha, scores):
     return offset
 
 
-def save_results(args, res, n_intervention, n_observation):
+def save_results(args, res, n_intervention, n_observation, cur_time, random_number):
     res['n_intervention'] = n_intervention
     res['n_observation'] = n_observation
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
