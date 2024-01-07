@@ -258,8 +258,8 @@ def run_conformal(df_o, df_i,
                 K=K)
             
             # alpha
-            C0_l, C0_u = model.predict_counterfactual(X_test, T=0)
-            C1_l, C1_u = model.predict_counterfactual(X_test, T=1)
+            C0_l, C0_u = model.predict_counterfactual(X_test, 0, Y0, Y1)
+            C1_l, C1_u = model.predict_counterfactual(X_test, 1, Y0, Y1)
             coverage_0 = np.mean((Y0 >= C0_l) & (Y0 <= C0_u))
             coverage_1 = np.mean((Y1 >= C1_l) & (Y1 <= C1_u))
             interval_width_0 = np.mean(np.abs(C0_u - C0_l))
