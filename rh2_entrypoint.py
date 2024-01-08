@@ -32,6 +32,8 @@ n_estimators= env.params.n_estimators
 base_learner = env.params.base_learner
 density_ratio_model = env.params.density_ratio_model
 quantile_regression = env.params.quantile_regression
+
+# seed = env.params.seed
 # n_Y_bins = env.params.n_Y_bins
 
 # local_save_path = "/mnt/bn/confrank2/causal_TCP/results/"
@@ -49,18 +51,20 @@ print(f"output folder is {output_folder}")
 # train code
 
 # cmd = f'''python3 run_syn.py --dataset={dataset} --save_path={local_save_path}'''
-cmd = f'''python3 run_syn.py --dataset={dataset} \
-        --save_path={local_save_path} \
-        --n_inter_max={n_inter_max} \
-        --n_obs={n_obs} \
-        --n_estimators={n_estimators} \
-        --base_learner={base_learner} \
-        --density_ratio_model={density_ratio_model} \
-        --quantile_regression={quantile_regression} \
-        '''
+for seed in range(42,47):
+    cmd = f'''python3 run_syn.py --dataset={dataset} \
+            --save_path={local_save_path} \
+            --n_inter_max={n_inter_max} \
+            --n_obs={n_obs} \
+            --n_estimators={n_estimators} \
+            --base_learner={base_learner} \
+            --density_ratio_model={density_ratio_model} \
+            --quantile_regression={quantile_regression} \
+            --seed={seed} \
+            '''
 
-print(f'cmd: {cmd}')
-exit_code = subprocess.call(cmd, shell=True)
+    print(f'cmd: {cmd}')
+    exit_code = subprocess.call(cmd, shell=True)
 
 # copy generated model back to rh2
 if exit_code == 0:
