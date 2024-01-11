@@ -60,7 +60,7 @@ def main(args):
 
     n_observation = args.n_obs
     # n_intervention_list = np.arange(100, 1000, 100)
-    n_intervention_list =  np.arange(args.n_inter_min, args.n_inter_max, 100)
+    n_intervention_list =  np.arange(args.n_inter_min, args.n_inter_max, 200)
 
     d = 10
     alpha = 0.1
