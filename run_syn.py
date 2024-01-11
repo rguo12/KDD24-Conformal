@@ -17,6 +17,7 @@ def get_config():
     parser.add_argument('--dataset', type=str, default='cevae')
 
     parser.add_argument('--n_folds', type=int, default=5)
+    parser.add_argument('--test_frac', type=float, default=0.2)
     parser.add_argument('--n_inter_min', type=int, default=100)
     parser.add_argument('--n_inter_max', type=int, default=1000)
 
@@ -63,8 +64,8 @@ def main(args):
 
     d = 10
     alpha = 0.1
-    test_frac = 0.001 # n_observation * (1. - test_frac) is the real n_observation
-    n_folds = 3
+    test_frac = args.test_frac # n_observation * (1. - test_frac) is the real n_observation
+    n_folds = args.n_folds
     err_scale = 0.1
 
     # df_train, df_test = generate_lilei_hua_data()
@@ -109,9 +110,9 @@ def main(args):
                                 df_o,
                                 df_i,
                                 quantile_regression=True,
-                                n_folds=n_folds,
+                                n_folds=n_folds, #controls calib
                                 alpha=alpha,
-                                test_frac=test_frac,
+                                test_frac=test_frac, #controls test
                                 target="counterfactual",
                                 method = 'naive')
             

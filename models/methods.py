@@ -192,7 +192,7 @@ def run_conformal(df_o, df_i,
         train_data, test_data = df_o
     
     else:
-    
+        # test data is obs data, which does not matter as for test we consider ITE/CF Outcome
         train_data, test_data = train_test_split(df_o, test_size=test_frac, random_state=42)
 
 

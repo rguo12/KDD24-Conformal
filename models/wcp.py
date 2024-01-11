@@ -187,6 +187,7 @@ class WCP:
             CI_ITE_l = np.median(np.array(CI_ITE_l_list), axis=0)
             CI_ITE_u = np.median(np.array(CI_ITE_u_list), axis=0)
             return CI_ITE_l, CI_ITE_u
+        
         elif method == 'nested_exact':
             CI_ITE_l_list, CI_ITE_u_list = [], []
             for i in range(self.n_folds):
@@ -209,7 +210,8 @@ class WCP:
         
         if method == 'naive':   
             # Nothing needs to be done.
-            pass 
+            pass
+        
         elif method == 'nested_inexact': 
             for i in range(self.n_folds): 
                 X_calib_0 = self.X_calib_obs_list[i][self.T_calib_obs_list[i]==0, :]
@@ -279,6 +281,7 @@ class WCP:
                 self.tilde_C_ITE_model_u[i].fit(np.concatenate((X_calib_fold_two_0, X_calib_fold_two_1))[dummy_index, :], 
                                             np.concatenate((C1_u, C0_u))[dummy_index])
                 pause = True
+
         elif method == 'nested_exact':
             self.offset_list = []
             for i in range(self.n_folds):

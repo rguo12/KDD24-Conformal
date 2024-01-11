@@ -407,7 +407,7 @@ def generate_cevae_data(n_observation, n_intervention, d=1, err_scale=0.1, ps_st
 
     def generate_treatment(U, ps_strength=0.6, intervention=False):
 
-        ps = ps_strength*U + (1-ps_strength)*(1-U)
+        ps = ps_strength*U + (1-ps_strength)*(1-U) # closer to 0.5, less hidden confounding
 
         if intervention:
             return np.random.uniform(size=U.shape) < 0.5 * np.ones_like(U), ps

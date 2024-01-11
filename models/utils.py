@@ -10,7 +10,17 @@ import pandas as pd
 import time
 import random
 
-def split_data(data, n_folds, frac):
+def split_data(data, n_folds:int):
+    """_summary_
+
+    Args:
+        data (_type_): _description_
+        n_folds (int): number of folds for train/calib split
+        frac (_type_): not used
+
+    Returns:
+        _type_: _description_
+    """
     X_train_list, T_train_list, Y_train_list = [], [], []
     X_calib_list, T_calib_list, Y_calib_list = [], [], []
 
@@ -114,6 +124,8 @@ def standard_conformal(alpha, scores):
 def save_results(args, res, n_intervention, n_observation, cur_time, random_number):
     res['n_intervention'] = n_intervention
     res['n_observation'] = n_observation
+    res['conf_strength'] = args.conf_strength
+
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     
     run_name = f"{random_number}_{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_seed_{args.seed}"
