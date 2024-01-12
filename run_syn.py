@@ -14,12 +14,13 @@ def get_config():
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--save_path', type=str, default='./results')
     parser.add_argument('--debug', type=bool, default=True)
-    parser.add_argument('--dataset', type=str, default='cevae')
+    parser.add_argument('--dataset', type=str, default='ihdp')
 
     parser.add_argument('--n_folds', type=int, default=5)
     parser.add_argument('--test_frac', type=float, default=0.2)
     parser.add_argument('--n_inter_min', type=int, default=100)
-    parser.add_argument('--n_inter_max', type=int, default=1000)
+    parser.add_argument('--n_inter_max', type=int, default=500)
+    parser.add_argument('--n_inter_gap', type=int, default=100)
 
     # parser.add_argument('--n_obs_max', type=list, default=10000)
     # parser.add_argument('--n_obs_min', type=list, default=1000)
@@ -60,7 +61,7 @@ def main(args):
 
     n_observation = args.n_obs
     # n_intervention_list = np.arange(100, 1000, 100)
-    n_intervention_list =  np.arange(args.n_inter_min, args.n_inter_max, 200)
+    n_intervention_list = np.arange(args.n_inter_min, args.n_inter_max, args.n_inter_gap)
 
     d = 10
     alpha = 0.1
@@ -78,7 +79,6 @@ def main(args):
 
     for n_intervention in n_intervention_list:
         # n_intervention = args.n_intervention
-            
         if args.dataset == 'synthetic':
             df_o, df_i = generate_data(n_observation=n_observation,    
                                 n_intervention=n_intervention,
@@ -98,11 +98,21 @@ def main(args):
                 return
             
             df_o, df_i = IHDP_w_HC(n_intervention, args.seed, d=24,
-                hidden_confounding=True, beta_u=args.beta_u, root="/mnt/bn/confrank2/causal_TCP/data/IHDP")
+                hidden_confounding=True, beta_u=args.conf_strength, root="/mnt/bn/confrank2/causal_TCP/data/IHDP")
 
+            n_observation = df_o.shape[0]
 
         else:
             raise ValueError('select a dataset from [synthetic]')
+
+        n_obs_treated = df_o[df_o['T']==1].shape[0]
+        n_obs_controlled = df_o[df_o['T']==0].shape[0]
+
+        n_inter_treated = df_i[df_i['T']==1].shape[0]
+        n_inter_controlled = df_i[df_i['T']==0].shape[0]
+
+        utils.save_dataset_stats(args, cur_time, 
+                       n_obs_treated, n_obs_controlled, n_inter_treated, n_inter_controlled)
             
         # naive baseline
         if 'naive' in args.methods:
@@ -175,7 +185,11 @@ def main(args):
             #                                                                                 metalearner="DR", 
             #                                                                                 quantile_regression=True, 
             #                                                                                 alpha=0.1, 
-            #                                                                                 test_frac=0.1)
+            
+        print(
+            f"n_obs_treated: {n_obs_treated}, n_obs_controlled: {n_obs_controlled}, n_inter_treated: {n_inter_treated}, n_inter_controlled: {n_inter_controlled}")
+        
+
 
     pause = True
     return

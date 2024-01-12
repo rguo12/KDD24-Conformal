@@ -6,7 +6,7 @@ gitRepo:
   branchName: rc_dev1
   mnt: /opt/tiger/causal_TCP
   repoName: ai-lab-london/causal_TCP
-  commitSha: 48456d123ff5ddd9f1d65e6b329e60966e06dbac
+  commitSha: bb10e379b21821b94590eaf7caf45ca9ee09619e
   tag: ''
 pip: []
 imageMeta:
@@ -29,7 +29,7 @@ params:
     multiDefaultValue: []
     name: dataset
     isAdvance: false
-    defaultValue: ihdp
+    defaultValue: cevae
     required: false
     allowCustom: false
     hideParamByDefault: false
@@ -41,7 +41,7 @@ params:
     multiDefaultValue: []
     name: output_folder
     isAdvance: false
-    defaultValue: /home/byte_ailab_litg/user/ruocheng.guo/causal_TCP/
+    defaultValue: /home/byte_ailab_litg/user/ruocheng.guo/causal_TCP1/
     required: false
     allowCustom: false
     hideParamByDefault: false
@@ -49,6 +49,78 @@ params:
     selectOptions: []
     type: STRING
     hintMsg: path for output results
+  - arrayItemParams: {}
+    multiDefaultValue: []
+    name: n_inter_max
+    isAdvance: false
+    defaultValue: '1000'
+    required: false
+    allowCustom: false
+    hideParamByDefault: false
+    groupName: ''
+    selectOptions: []
+    type: INT
+    hintMsg: num of intervention samples
+  - arrayItemParams: {}
+    multiDefaultValue: ['1000', '5000', '10000', '20000', '50000']
+    name: n_obs
+    isAdvance: false
+    defaultValue: '10000'
+    required: false
+    allowCustom: false
+    hideParamByDefault: false
+    groupName: ''
+    selectOptions: []
+    type: INT
+    hintMsg: n obs
+  - arrayItemParams: {}
+    multiDefaultValue: []
+    name: n_estimators
+    isAdvance: false
+    defaultValue: '50'
+    required: false
+    allowCustom: false
+    hideParamByDefault: false
+    groupName: ''
+    selectOptions: []
+    type: INT
+    hintMsg: n est for GBM and RF
+  - arrayItemParams: {}
+    multiDefaultValue: []
+    name: base_learner
+    isAdvance: false
+    defaultValue: '"GBM"'
+    required: false
+    allowCustom: false
+    hideParamByDefault: false
+    groupName: ''
+    selectOptions: []
+    type: STRING
+    hintMsg: GBM or RF
+  - arrayItemParams: {}
+    multiDefaultValue: []
+    name: density_ratio_model
+    isAdvance: false
+    defaultValue: '"MLP"'
+    required: false
+    allowCustom: false
+    hideParamByDefault: false
+    groupName: ''
+    selectOptions: []
+    type: STRING
+    hintMsg: MLP or DR
+  - arrayItemParams: {}
+    multiDefaultValue: []
+    name: quantile_regression
+    isAdvance: false
+    defaultValue: 'true'
+    required: false
+    allowCustom: false
+    hideParamByDefault: false
+    groupName: ''
+    selectOptions: []
+    type: BOOL
+    hintMsg: use quantile_reg or not
 env: {}
 mlxCommandScript: ''
 scms: []
@@ -72,7 +144,7 @@ resource:
     roleImages: []
     hybrid: false
     retryTimes: 0
-    clusterId: 20 #hl
+    clusterId: 20
     enableRayOnArnold: false
     queuePriority: 0
     resSchedulingPolicy: ''
@@ -129,4 +201,4 @@ resProfileComments: ''
 codeRepoName: ''
 entrypointFullScript: python3 /opt/tiger/causal_TCP/rh2_entrypoint.py
 entryPoint: ''
-arnoldTaskId: '5390104'
+arnoldTaskId: ''

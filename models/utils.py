@@ -121,6 +121,33 @@ def standard_conformal(alpha, scores):
     return offset
 
 
+def save_dataset_stats(args, cur_time, 
+                       n_obs_treated, n_obs_controlled, n_inter_treated, n_inter_controlled):
+
+    res = {}
+    res['n_obs_treated'] = n_obs_treated
+    res['n_obs_controlled'] = n_obs_controlled
+    res['n_inter_treated'] = n_inter_treated
+    res['n_inter_treated'] = n_inter_controlled
+
+    df = pd.DataFrame.from_dict(res, orient="index").transpose()
+    
+    run_name = f"dataset_stats.csv"
+
+    folder_name = os.path.join(args.save_path,args.dataset,cur_time) #local path
+    if not os.path.isdir(folder_name):
+        os.mkdir(folder_name)
+
+    fn = os.path.join(folder_name,f'{run_name}.csv')
+
+    print(f"saving results to {fn}")
+    
+    if not os.path.exists(fn):
+        os.makedirs(os.path.dirname(fn), exist_ok=True)
+        df.to_csv(fn)
+    else:
+        df.to_csv(fn, mode='a', header=False)
+
 def save_results(args, res, n_intervention, n_observation, cur_time, random_number):
     res['n_intervention'] = n_intervention
     res['n_observation'] = n_observation

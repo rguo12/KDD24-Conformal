@@ -257,6 +257,7 @@ def IHDP_w_HC(n_intervention:int, seed:int, d:int=24,
         seed (_type_): _description_
         hidden_confounding (_type_): _description_
         beta_u (_type_, optional): strength of hidden confounding, from 0.1 to 0.5.
+        n_obs is not specified
 
     Raises:
         NotImplementedError: _description_
@@ -439,6 +440,69 @@ def generate_cevae_data(n_observation, n_intervention, d=1, err_scale=0.1, ps_st
 
     return df_observation, df_intervention
 
+
+def generate_our_data(n_observation, n_intervention, d=1, err_scale=0.1, ps_strength=0.6):
+    # generate data from our assumptions
+
+    def generate_confounder(n):
+        return np.random.normal(0., 1., size=(n, ))
+
+    def generate_covariate(T, sigma_z0=5.0, sigma_z1=3.0, intervention=False, x_dim = 50):
+        T = T * 0.6
+        if intervention:
+            I = 1.0
+        else:
+            I = -1.0
+        variance_X =  sigma_z0**2*(1-T) + sigma_z1**2*T - 1.0 + I # 
+
+        return np.random.normal(0., 1., size=(T.shape,x_dim)) * variance_X
+
+    def generate_treatment(U, ps_strength=0.6, intervention=False):
+
+        ps = ps_strength*U + (1-ps_strength)*(1-U) # closer to 0.5, less hidden confounding
+
+        if intervention:
+            return np.random.uniform(size=U.shape) < 0.5 * np.ones_like(U), ps
+        else:
+            return np.random.uniform(size=U.shape) < ps, ps
+
+    def generate_theta(U, T, sigma_theta0=1.0, sigma_theta1=2.0, intervention=False, x_dim=50):
+        if intervention:
+            I = 1.0
+        else:
+            I = -1.0
+        var_theta = sigma_theta0**2*(1-T) + sigma_theta1**2*T + U * 3.0 + I
+        theta = np.random.normal(0., 1., size=(T.shape,x_dim)) * var_theta
+
+        return theta
+
+
+    def generate_outcomes(U, n, err_scale=0.1, intervention=False):
+        errY1 = np.random.normal(0., 1., size=(n, )) * err_scale
+        errY0 = np.random.normal(0., 1., size=(n, )) * err_scale
+        tau1 = expit(3.0*(U+2))
+        tau0 = expit(3.0*(U-2))
+        Y1 = tau1 + errY1
+        Y0 = tau0 + errY0
+        return Y1, Y0
+    
+    # Generate observation data
+    U_obs = generate_confounder(n_observation)
+    T_obs, ps_obs = generate_treatment(U_obs, ps_strength)
+
+    X_obs = generate_covariate(U_obs)
+    Y1_obs, Y0_obs = generate_outcomes(U_obs, n_observation, err_scale)
+    df_observation = assemble_data(X_obs, T_obs, Y1_obs, Y0_obs, d, ps_obs)
+
+    # Generate intervention data
+    U_int = generate_confounder(n_intervention)
+    T_int, ps_int = generate_treatment(U_int, ps_strength, intervention=True) #ps is the true ps, just for recording, not 0.5
+
+    X_int = generate_covariate(U_int)
+    Y1_int, Y0_int = generate_outcomes(U_int, n_intervention, err_scale)
+    df_intervention = assemble_data(X_int, T_int, Y1_int, Y0_int, d, ps_int)
+
+    return df_observation, df_intervention
 
 
 
