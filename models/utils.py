@@ -10,6 +10,9 @@ import pandas as pd
 import time
 import random
 
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+
 def split_data(data, n_folds:int):
     """_summary_
 
@@ -28,6 +31,7 @@ def split_data(data, n_folds:int):
     T = data['T'].values
     Y = data['Y'].values
 
+    # use this to maintain the same P(T) for tr and calib
     skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
     train_index_list, calib_index_list = [], []
     for train_index, calib_index in skf.split(X, T):
@@ -128,7 +132,7 @@ def save_dataset_stats(args, cur_time,
     res['n_obs_treated'] = n_obs_treated
     res['n_obs_controlled'] = n_obs_controlled
     res['n_inter_treated'] = n_inter_treated
-    res['n_inter_treated'] = n_inter_controlled
+    res['n_inter_controlled'] = n_inter_controlled
 
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     
@@ -189,3 +193,37 @@ def preprocess(args):
     if args.seed is None:
         args.seed = int(time.time())
     return args
+
+
+def plot_tsne(X_calib, X_test, j, dataset='ihdp', T=0, fig_name:str="featdist"):
+
+    # Combine the calibration and test data
+    X_combined = np.vstack((X_calib, X_test))
+
+    # Apply t-SNE to reduce dimensionality to 2D
+    tsne = TSNE(n_components=2, random_state=42)
+    X_tsne = tsne.fit_transform(X_combined)
+
+    # Split the data back into calibration and test sets
+    X_calib_tsne = X_tsne[:len(X_calib)]
+    X_test_tsne = X_tsne[len(X_calib):]
+
+    n_test = len(X_test)
+    n_calib = len(X_calib)
+
+    # Create a scatter plot
+    plt.figure(figsize=(8, 6))
+    plt.scatter(X_calib_tsne[:, 0], X_calib_tsne[:, 1], label='Calibration Data', c='blue', alpha=0.7)
+    plt.scatter(X_test_tsne[:, 0], X_test_tsne[:, 1], label='Test Data', c='red', alpha=0.7)
+    plt.title(f't-SNE Plot n_calib:{n_calib}, n_test:{n_test}')
+    plt.xlabel('t-SNE Dimension 1')
+    plt.ylabel('t-SNE Dimension 2')
+    plt.legend()
+    
+    # Save the plot as feature_dist_j.png
+    plt.savefig(f'figs/{dataset}/{fig_name}_T_{T}_split_{j}.png')
+    # plt.show()
+
+# Example usage:
+# Replace X_calib_j, X_test, and feature_name with your actual data and feature name.
+# plot_tsne(X_calib_j, X_test, 'Your_Feature_Name')

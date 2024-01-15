@@ -16,7 +16,7 @@ def get_config():
     parser.add_argument('--debug', type=bool, default=True)
     parser.add_argument('--dataset', type=str, default='ihdp')
 
-    parser.add_argument('--n_folds', type=int, default=5)
+    parser.add_argument('--n_folds', type=int, default=3)
     parser.add_argument('--test_frac', type=float, default=0.2)
     parser.add_argument('--n_inter_min', type=int, default=100)
     parser.add_argument('--n_inter_max', type=int, default=500)
@@ -41,6 +41,9 @@ def get_config():
     parser.add_argument('--n_estimators', type=int, default=50)
     parser.add_argument('--quantile_regression', type=bool, default=True, 
                         help="True for quantile regression, False for normal regression")
+    
+    parser.add_argument('--plot_dist', type=bool, default=False, 
+                        help="True for plotting P(X,Y) for calib and test")
     
     # TCP
     parser.add_argument('--n_Y_bins', type=int, default=10)
@@ -90,6 +93,9 @@ def main(args):
         elif args.dataset == 'cevae':
             df_o, df_i = generate_cevae_data(n_observation, n_intervention, err_scale = err_scale)
 
+        elif args.dataset == 'ours':
+            df_o, df_i = generate_our_data(n_observation, n_intervention, err_scale = err_scale)
+
         elif args.dataset == 'ihdp':
             # as ihdp is a small dataset w. 740+ samples
             # we only allow the n_intervention to be no larger than 500
@@ -124,7 +130,9 @@ def main(args):
                                 alpha=alpha,
                                 test_frac=test_frac, #controls test
                                 target="counterfactual",
-                                method = 'naive')
+                                method = 'naive',
+                                plot=args.plot_dist,
+                                dataset=args.dataset)
             
             utils.save_results(args, res, n_intervention, n_observation, cur_time, random_number)
 
@@ -166,8 +174,7 @@ def main(args):
             utils.save_results(args, res, n_intervention, n_observation, cur_time, random_number)
 
         if 'TCP' in args.methods:
-            res = run_conformal(
-                                df_o,
+            res = run_conformal(df_o,
                                 df_i,
                                 quantile_regression=args.quantile_regression, # QR not implemented yet
                                 n_folds=n_folds,

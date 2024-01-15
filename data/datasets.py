@@ -359,7 +359,7 @@ def IHDP_w_HC(n_intervention:int, seed:int, d:int=24,
 
     n = len(y)
 
-    # obs int split
+    # obs int random split
     df_obs_raw, df_int_raw = model_selection.train_test_split(
         df, test_size=float(n_intervention)/n, random_state=seed
     )
@@ -391,7 +391,8 @@ def IHDP_w_HC(n_intervention:int, seed:int, d:int=24,
     Y0_int = df_int_raw["y0"].to_numpy(dtype="float32")
     Y1_int = df_int_raw["y1"].to_numpy(dtype="float32")
 
-    df_int = assemble_data(X_int, T_int, Y1_int, Y0_int, d, ps_int, mu1=mu1_int, mu0=mu0_int)
+    df_int = assemble_data(X_int, T_int, Y1_int, Y0_int, d, ps_int, 
+                           mu1=mu1_int, mu0=mu0_int)
 
     return df_obs, df_int
 
@@ -477,11 +478,22 @@ def generate_our_data(n_observation, n_intervention, d=1, err_scale=0.1, ps_stre
         return theta
 
 
-    def generate_outcomes(U, n, err_scale=0.1, intervention=False):
+    def generate_outcomes(X, n, theta, err_scale=0.1, intervention=False, nonlinear=False):
+
+
         errY1 = np.random.normal(0., 1., size=(n, )) * err_scale
         errY0 = np.random.normal(0., 1., size=(n, )) * err_scale
-        tau1 = expit(3.0*(U+2))
-        tau0 = expit(3.0*(U-2))
+
+        if intervention:
+            errY1 *= 2.0
+            errY2 *= 2.0
+
+        tau1 = 3.0*(np.matmul(X,theta)+2) #expit(3.0*(U+2))
+        tau0 = 3.0*(np.matmul(X,theta)-2) #expit(3.0*(U-2))
+        if nonlinear:
+            tau1 = expit(tau1)
+            tau2 = expit(tau2)
+
         Y1 = tau1 + errY1
         Y0 = tau0 + errY0
         return Y1, Y0
@@ -491,7 +503,8 @@ def generate_our_data(n_observation, n_intervention, d=1, err_scale=0.1, ps_stre
     T_obs, ps_obs = generate_treatment(U_obs, ps_strength)
 
     X_obs = generate_covariate(U_obs)
-    Y1_obs, Y0_obs = generate_outcomes(U_obs, n_observation, err_scale)
+    theta_obs = generate_theta(U_obs, n_observation, intervention=False)
+    Y1_obs, Y0_obs = generate_outcomes(X_obs, theta_obs, n_observation, err_scale)
     df_observation = assemble_data(X_obs, T_obs, Y1_obs, Y0_obs, d, ps_obs)
 
     # Generate intervention data
@@ -499,7 +512,8 @@ def generate_our_data(n_observation, n_intervention, d=1, err_scale=0.1, ps_stre
     T_int, ps_int = generate_treatment(U_int, ps_strength, intervention=True) #ps is the true ps, just for recording, not 0.5
 
     X_int = generate_covariate(U_int)
-    Y1_int, Y0_int = generate_outcomes(U_int, n_intervention, err_scale)
+    theta_int = generate_theta(U_int, n_intervention, intervention=True)
+    Y1_int, Y0_int = generate_outcomes(X_int, theta_int, n_intervention, err_scale)
     df_intervention = assemble_data(X_int, T_int, Y1_int, Y0_int, d, ps_int)
 
     return df_observation, df_intervention

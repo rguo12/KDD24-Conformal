@@ -33,7 +33,7 @@ class BaseCP:
     
     def __init__(self, data_obs, data_inter, n_folds,
                  alpha=0.1, base_learner="RF", 
-                 quantile_regression=True, n_estimators : int = 10, calib_frac=0.25):
+                 quantile_regression=True, n_estimators : int = 10):
 
         """
         Base class for conformal prediction, including transductive and split naive, inexact and exact.
@@ -205,6 +205,7 @@ class SplitCP(BaseCP):
             self.models_l_1 = [base_learners_dict[self.base_learner](**self.first_CQR_args_l) for _ in range(self.n_folds)]
 
             for j in range(self.n_folds):
+                # trained by one split of the inter data
                 X_train_inter_0 = self.X_train_inter_list[j][self.T_train_inter_list[j]==0, :]
                 Y_train_inter_0 = self.Y_train_inter_list[j][self.T_train_inter_list[j]==0]
                 X_train_inter_1 = self.X_train_inter_list[j][self.T_train_inter_list[j]==1, :]
@@ -420,11 +421,13 @@ class SplitCP(BaseCP):
             X_calib_inter_1 = self.X_calib_inter_list[j][self.T_calib_inter_list[j]==1, :]
             Y_calib_inter_1 = self.Y_calib_inter_list[j][self.T_calib_inter_list[j]==1]
 
-            scores_0 = np.maximum(self.models_l_0[j].predict(X_calib_inter_0) - Y_calib_inter_0, Y_calib_inter_0 - self.models_u_0[j].predict(X_calib_inter_0))
+            scores_0 = np.maximum(self.models_l_0[j].predict(X_calib_inter_0) - Y_calib_inter_0,
+                                   Y_calib_inter_0 - self.models_u_0[j].predict(X_calib_inter_0))
             offset_0 = utils.standard_conformal(alpha, scores_0)
             offset_0_list.append(offset_0)
 
-            scores_1 = np.maximum(self.models_l_1[j].predict(X_calib_inter_1) - Y_calib_inter_1, Y_calib_inter_1 - self.models_u_1[j].predict(X_calib_inter_1))
+            scores_1 = np.maximum(self.models_l_1[j].predict(X_calib_inter_1) - Y_calib_inter_1,
+                                   Y_calib_inter_1 - self.models_u_1[j].predict(X_calib_inter_1))
             offset_1 = utils.standard_conformal(alpha, scores_1)
             offset_1_list.append(offset_1)
 
@@ -443,6 +446,7 @@ class SplitCP(BaseCP):
         y1_l = np.median(np.array(y1_l_list), axis=0) - np.median(np.array(offset_1_list), axis=0)
         y1_u = np.median(np.array(y1_u_list), axis=0) + np.median(np.array(offset_1_list), axis=0)
         pause = True
+
         return y0_l, y0_u, y1_l, y1_u
 
 

@@ -11,6 +11,8 @@ from models.drlearner import *
 from models.wcp import *
 from models.tcp import *
 
+from models.utils import plot_tsne
+
 def conformal_metalearner(df, metalearner="DR", quantile_regression=True, alpha=0.1, test_frac=0.1):
     
     if len(df)==2:
@@ -169,7 +171,9 @@ def run_conformal(df_o, df_i,
                   density_ratio_model : str = "MLP",
                   base_learner : str = "RF",
                   n_estimators:int = 10,
-                  K:int = 10):
+                  K:int = 10,
+                  plot:bool = False,
+                  dataset:str = None):
     """_summary_
     Run naive CP on intervention, and our exact and inexact methods
 
@@ -195,11 +199,14 @@ def run_conformal(df_o, df_i,
         # test data is obs data, which does not matter as for test we consider ITE/CF Outcome
         train_data, test_data = train_test_split(df_o, test_size=test_frac, random_state=42)
 
-
     X_test = test_data.filter(like = 'X').values
     T_test = test_data[['T']].values.reshape((-1,)) 
-    Y_test = test_data[['Y']].values.reshape((-1,))
+    Y_test = test_data[['Y']].values
     ps_test = test_data[['ps']].values
+
+    D_test = np.concatenate((X_test, Y_test),axis=1)
+
+    Y_test = Y_test.reshape(-1)
 
     Y0, Y1 = test_data[['Y0']].values.reshape((-1,)), test_data[['Y1']].values.reshape((-1,))
     ITE_test = Y1 - Y0
@@ -211,13 +218,28 @@ def run_conformal(df_o, df_i,
                         n_folds=n_folds,
                         alpha=alpha, 
                         base_learner=base_learner, 
-                        quantile_regression=quantile_regression) 
+                        quantile_regression=quantile_regression)
             
             C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_naive(alpha, X_test, Y0, Y1)
+
             coverage_0 = np.mean((Y0 >= C0_l) & (Y0 <= C0_u))
             coverage_1 = np.mean((Y1 >= C1_l) & (Y1 <= C1_u))
             interval_width_0 = np.mean(np.abs(C0_u - C0_l))
             interval_width_1 = np.mean(np.abs(C1_u - C1_l))
+
+            if plot:
+                # plot to check exchangeability
+                for j in range(n_folds):
+                    X_calib_inter_0 = model.X_calib_inter_list[j][model.T_calib_inter_list[j]==0, :]
+                    Y_calib_inter_0 = model.Y_calib_inter_list[j][model.T_calib_inter_list[j]==0].reshape(-1,1)
+                    X_calib_inter_1 = model.X_calib_inter_list[j][model.T_calib_inter_list[j]==1, :]
+                    Y_calib_inter_1 = model.Y_calib_inter_list[j][model.T_calib_inter_list[j]==1].reshape(-1,1)
+
+                    D_calib_inter_0 = np.concatenate([X_calib_inter_0, Y_calib_inter_0],axis=1)
+                    D_calib_inter_1 = np.concatenate([X_calib_inter_1, Y_calib_inter_1],axis=1)
+
+                    plot_tsne(D_calib_inter_0, D_test, j, T=0, dataset=dataset, fig_name="xydist")
+                    plot_tsne(D_calib_inter_1, D_test, j, T=1, dataset=dataset, fig_name="xydist")
 
         elif method == 'inexact':
             model = SplitCP(data_obs=train_data,
