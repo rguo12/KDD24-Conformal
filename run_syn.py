@@ -104,7 +104,8 @@ def main(args):
                 return
             
             df_o, df_i = IHDP_w_HC(n_intervention, args.seed, d=24,
-                hidden_confounding=True, beta_u=args.conf_strength, root="/mnt/bn/confrank2/causal_TCP/data/IHDP")
+                hidden_confounding=True, beta_u=args.conf_strength, 
+                root="/mnt/bn/confrank2/causal_TCP/data/IHDP")
 
             n_observation = df_o.shape[0]
 

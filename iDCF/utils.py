@@ -498,6 +498,8 @@ def mf_conf_eval_splitcp(cal_obs_loaders:list, cal_int_loaders:list, test_int_lo
         # compute scores on cal_obs
         scores_list = mf_calib(cal_obs_loader, model_u, model_l, 
                                device=device, alpha=alpha, params=params, standardize=standardize)
+        
+        plot_vec_dist(scores_list, folder_name="iDCF/figs", filename='nonconf_score_cal_obs.png')
 
         D_calib_obs = get_density_ratio_data(cal_obs_loader, model_u, device=device)
         D_calib_int = get_density_ratio_data(cal_int_loader, model_u, device=device)
@@ -636,7 +638,7 @@ def mf_conf_eval_splitcp(cal_obs_loaders:list, cal_int_loaders:list, test_int_lo
 
 
 def mf_conf_eval_naive(cal_loaders:list, test_loaders:list, model_u_list:list, model_l_list:list, 
-                 device="cpu", params=None, alpha=0.1, standardize=True):
+                 device:str="cpu", params=None, alpha:float=0.1, standardize:bool=True):
 
     n_folds = len(cal_loaders)
 
@@ -657,6 +659,9 @@ def mf_conf_eval_naive(cal_loaders:list, test_loaders:list, model_u_list:list, m
         model_l.eval()
         
         scores_list = mf_calib(cal_loader, model_u, model_l, device=device, alpha=alpha, standardize=standardize)
+
+        plot_vec_dist(scores_list, folder_name="iDCF/figs", filename='nonconf_score_cal_int.png')
+
         offset = standard_conformal(alpha, scores_list)
 
         with torch.no_grad():
@@ -896,7 +901,7 @@ def construct_naive_mf_dataloader(config, device, require_index=False):
             }
     else:
         train_ratings = train_mat[:, 2]
-        
+
     train_loader, val_loader, test_loader = get_dataloader(train_mat,
                                                            train_ratings,
                                                            val_mat,
@@ -1054,3 +1059,27 @@ def read_best_params(model, key_name, sr=0.1, cr=2.0, tr=0.0):
                     if param[key_name] == key:
                         return param
     raise Exception("invalid ")
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+def plot_vec_dist(x, folder_name="figs", filename='nonconf_score.png'):
+    """
+    Plots and saves a comparison of the distributions of two vectors.
+
+    :param vector1: First vector of numeric values.
+    :param vector2: Second vector of numeric values.
+    :param filename: Filename for the saved plot. Defaults to 'distribution_comparison.png'.
+    """
+    plt.figure(figsize=(10, 6))
+    plt.hist(x, bins=30, alpha=0.5, label='Vector 1')
+    # plt.hist(vector2, bins=30, alpha=0.5, label='Vector 2')
+    plt.xlabel('Value')
+    plt.ylabel('Frequency')
+    plt.title('Nonconf Score Dist')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(os.path.join(folder_name,filename))
+    plt.close()

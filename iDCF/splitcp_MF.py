@@ -89,7 +89,7 @@ def train_eval(config):
                 predict_u = model_u(uid, iid).view(-1)
                 predict_l = model_l(uid, iid).view(-1)
 
-                l2 = torch.tensor([0.])
+                # l2 = torch.tensor([0.])
 
                 loss_u = loss_func_u(predict_u, rating)
                 loss_l = loss_func_l(predict_l, rating)
@@ -145,6 +145,7 @@ def train_eval(config):
 
         if method == "naive":
             density_ratio_model = None
+
         elif method in ["exact", "inexact"]:
             # train density ratio model after training MF model
             print("training density ratio model...")
@@ -168,6 +169,7 @@ def train_eval(config):
                                                                 dr_model_list=dr_model_list,
                                                                 exact=config["exact"],
                                                                 dr_model=config["dr_model"])
+        
     elif method == "naive":
         ts_coverages, ts_inter_widths = mf_conf_eval_naive(val_int_loaders, test_int_loaders, model_u_list, model_l_list,
                  device=DEVICE, params=None, alpha=0.1, standardize=False)
@@ -177,6 +179,7 @@ def train_eval(config):
                 "test_coverage": ts_coverages,
                 "test_interval_width": ts_inter_widths
             }
+    
     print(results)
 
     # if config["tune"]:
@@ -259,7 +262,7 @@ if __name__ == '__main__':
             "patience": args.patience,
             "lr_rate": 5e-4,
             "weight_decay": 1e-5,
-            "epochs": 100,
+            "epochs": 5,
             "batch_size": args.data_params["batch_size"],
             "embedding_dim": 64,
             "topk": args.topk,

@@ -217,7 +217,7 @@ def run_conformal(df_o, df_i,
                         data_inter=df_i,
                         n_folds=n_folds,
                         alpha=alpha, 
-                        base_learner=base_learner, 
+                        base_learner=base_learner,
                         quantile_regression=quantile_regression)
             
             C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_naive(alpha, X_test, Y0, Y1)

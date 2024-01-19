@@ -208,7 +208,7 @@ if __name__ == '__main__':
             "patience": args.patience,
             "lr_rate": 5e-4,
             "weight_decay": 1e-5,
-            "epochs": 100,
+            "epochs": 5,
             "batch_size": args.data_params["batch_size"],
             "embedding_dim": 64,
             "topk": args.topk,

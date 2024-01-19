@@ -19,7 +19,7 @@ coat_params = {
     "threshold": 4.0,
     "min_val": 1.0,
     "max_val": 5.0,
-    "batch_size": 512,
+    "batch_size": 1024,
     "beta_max": 1.,
     "name": "coat",
 }
