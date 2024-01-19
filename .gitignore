@@ -31,3 +31,23 @@ data/ihdp_class.py
 
 my_credentials.json
 run_arnold.py
+
+iDCF/models/vae.py
+
+iDCF/cal_mcc.py
+iDCF/dcf_rating.py
+iDCF/deepcausal-mf.py
+iDCF/iDCF-W.py
+iDCF/iDCF.py
+iDCF/InvPref.py
+iDCF/IPS.py
+iDCF/ivae_exposure.py
+
+iDCF/MF.py
+iDCF/MF-WF.py
+iDCF/RD-IPS.py
+iDCF/read_best_params.py
+iDCF/README.md
+iDCF/save_as_params.ipynb
+iDCF/tune_script.py
+iDCF/vae_exposure.py

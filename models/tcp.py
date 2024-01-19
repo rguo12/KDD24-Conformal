@@ -317,6 +317,7 @@ class SplitCP(BaseCP):
             X_calib_inter_1 = self.X_calib_inter_list[j][self.T_calib_inter_list[j]==1, :]
             Y_calib_inter_1 = self.Y_calib_inter_list[j][self.T_calib_inter_list[j]==1]
 
+            # split calib inter data into two folds
             calib_num_0, calib_num_1 = len(X_calib_inter_0), len(X_calib_inter_1)
             X_calib_inter_0_fold_one, X_calib_inter_0_fold_two = X_calib_inter_0[:int(calib_num_0/2), :], X_calib_inter_0[int(calib_num_0/2):, :]
             Y_calib_inter_0_fold_one, Y_calib_inter_0_fold_two = Y_calib_inter_0[:int(calib_num_0/2)], Y_calib_inter_0[int(calib_num_0/2):]
@@ -333,6 +334,7 @@ class SplitCP(BaseCP):
                 X_calib_obs_1 = self.X_calib_obs_list[i][self.T_calib_obs_list[i]==1, :]
                 Y_calib_obs_1 = self.Y_calib_obs_list[i][self.T_calib_obs_list[i]==1]
 
+                # only use one fold of calib_int data to compute weights dr model
                 D_calib_obs_0 = np.concatenate((X_calib_obs_0, Y_calib_obs_0[:, None]), axis=1)
                 D_calib_inter_0 = np.concatenate((X_calib_inter_0_fold_one, Y_calib_inter_0_fold_one[:, None]), axis=1)
                 D_calib_obs_1 = np.concatenate((X_calib_obs_1, Y_calib_obs_1[:, None]), axis=1)
@@ -342,7 +344,8 @@ class SplitCP(BaseCP):
                 weights_calib_inter_0 = self.density_models_0[j][i].compute_density_ratio(D_calib_inter_0)
                 weights_calib_obs_1 = self.density_models_1[j][i].compute_density_ratio(D_calib_obs_1)
                 weights_calib_inter_1 = self.density_models_1[j][i].compute_density_ratio(D_calib_inter_1)
-            
+
+                # still use calib_obs to compute nonconf scores
                 scores_0 = np.maximum(self.models_l_0[j][i].predict(X_calib_obs_0) - Y_calib_obs_0, Y_calib_obs_0 - self.models_u_0[j][i].predict(X_calib_obs_0))
                 offset_0 = utils.weighted_conformal(alpha, weights_calib_obs_0, weights_calib_inter_0, scores_0)
                 offset_0_list.append(offset_0)
@@ -390,6 +393,7 @@ class SplitCP(BaseCP):
         C_calib_l_0 = np.concatenate(C_calib_l_0, axis=0)
         C_calib_l_1 = np.concatenate(C_calib_l_1, axis=0)
 
+        # use fold one of calib_int data to fit regression on y_u and y_l
         self.C0_l_model.fit(X_calib_inter_0_fold_one_all, C_calib_l_0)
         self.C0_u_model.fit(X_calib_inter_0_fold_one_all, C_calib_u_0)
         self.C1_l_model.fit(X_calib_inter_1_fold_one_all, C_calib_l_1)
@@ -398,6 +402,7 @@ class SplitCP(BaseCP):
         scores_C0 = np.maximum(self.C0_l_model.predict(X_calib_inter_0_fold_two_all) - Y_calib_inter_0_fold_two_all, 
                                Y_calib_inter_0_fold_two_all - self.C0_u_model.predict(X_calib_inter_0_fold_two_all))
         offset_C0 = utils.standard_conformal(alpha, scores_C0)
+
         scores_C1 = np.maximum(self.C1_l_model.predict(X_calib_inter_1_fold_two_all) - Y_calib_inter_1_fold_two_all, 
                                Y_calib_inter_1_fold_two_all - self.C1_u_model.predict(X_calib_inter_1_fold_two_all))
         offset_C1 = utils.standard_conformal(alpha, scores_C1)

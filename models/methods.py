@@ -261,7 +261,8 @@ def run_conformal(df_o, df_i,
                 n_folds=n_folds,
                 alpha=alpha / 2, 
                 base_learner="RF", 
-                quantile_regression=quantile_regression) 
+                quantile_regression=quantile_regression)
+            
             C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_exact(alpha / 2, X_test, Y0, Y1)
             coverage_0 = np.mean((Y0 >= C0_l) & (Y0 <= C0_u))
             coverage_1 = np.mean((Y1 >= C1_l) & (Y1 <= C1_u))

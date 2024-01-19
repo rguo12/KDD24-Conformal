@@ -1,0 +1,219 @@
+from torch import nn
+from models.mf import MF
+from torch.utils.data import Dataset, DataLoader
+from utils import *
+from ray.air import session
+from argparser import *
+from tune_script import *
+from evaluator import Evaluator, mf_evaluate
+from seeds import test_seeds
+
+from tqdm import tqdm
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+import os
+os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
+
+def train_eval(config):
+    metric = config["metric"]
+
+    val_loaders = []
+    test_loaders = []
+
+    model_u_list = []
+    model_l_list = []
+
+    for i in range(config["n_folds"]):
+        train_loader, val_loader, test_loader, evaluation_params, n_users, n_items = construct_naive_mf_dataloader(config, DEVICE)
+        seed_everything(config["seed"]+i)
+
+        val_loaders.append(val_loader)
+        test_loaders.append(test_loader)
+
+        # two quantile MF regression models, for upper/lower bound
+        model_u = MF(n_users, n_items, config["embedding_dim"]).to(DEVICE)
+        model_l = MF(n_users, n_items, config["embedding_dim"]).to(DEVICE)
+
+        model_u_list.append(model_u)
+        model_l_list.append(model_l)
+
+        optimizer_u = torch.optim.Adam(params=model_u.parameters(), lr=config["lr_rate"], weight_decay=config["weight_decay"])
+        optimizer_l = torch.optim.Adam(params=model_l.parameters(), lr=config["lr_rate"], weight_decay=config["weight_decay"])
+
+        # loss_func = nn.MSELoss()
+        quantile_u = 0.95  # For upper bound model
+        quantile_l = 0.05  # For lower bound model
+
+        loss_func_u = PinballLoss(quantile_u)
+        loss_func_l = PinballLoss(quantile_l)
+
+        evaluator_u = Evaluator("mpe", patience_max=config["patience"])
+        evaluator_l = Evaluator("mpe", patience_max=config["patience"])
+
+        evaluator_test_coverage = Evaluator("test_coverage", patience_max=config["patience"])
+        evaluator_test_interval_width = Evaluator("test_interval_width", patience_max=config["patience"])
+
+        for epoch in tqdm(range(config["epochs"])):
+            model_u.train()
+            model_l.train()
+
+            total_loss_u = 0
+            total_loss_l = 0
+            total_len = 0
+
+            for index, (uid, iid, rating) in enumerate(train_loader):
+                uid, iid, rating = uid.to(DEVICE), iid.to(DEVICE), rating.float().to(DEVICE)
+
+                predict_u = model_u(uid, iid).view(-1)
+                predict_l = model_l(uid, iid).view(-1)
+
+                l2 = torch.tensor([0.])
+
+                loss_u = loss_func_u(predict_u, rating)
+                loss_l = loss_func_l(predict_l, rating)
+
+                optimizer_u.zero_grad()
+                loss_u.backward()
+                optimizer_u.step()
+
+                optimizer_l.zero_grad()
+                loss_l.backward()
+                optimizer_l.step()
+
+                total_loss_u += loss_u.item() * len(rating)
+                total_loss_l += loss_l.item() * len(rating)
+                total_len += len(rating)
+
+            evaluator_u.record_training(total_loss_u / total_len)
+            evaluator_l.record_training(total_loss_l / total_len)
+
+            model_u.eval()
+            model_l.eval()
+
+            # select model by mpe
+            validation_performance_u = mf_evaluate("mpe", val_loader, model_u, device=DEVICE,
+                                                params=evaluation_params)
+            
+            # early stopping using model_u's performance only
+            early_stop = evaluator_u.record_val(validation_performance_u, model_u.state_dict())
+            
+            # TODO: only do conformal after training
+
+            if not config["tune"]:
+                # for test performance, we compute coverage and interval length
+                # ts_cover, ts_inter_width = mf_conf_eval(val_loader, test_loader, model_u, model_l, 
+                #     device=DEVICE, params=None, alpha=0.1, standardize=False)
+                # evaluator_test_coverage.record_test(ts_cover)
+                # evaluator_test_interval_width.record_test(ts_inter_width)
+                pass
+                
+            if config["show_log"]:
+                # evaluator_test_coverage.epoch_log(epoch)
+                # evaluator_test_interval_width.epoch_log(epoch)
+                evaluator_u.epoch_log(epoch)
+
+            if early_stop:
+                if config["show_log"]:
+                    print("reach max patience {}, current epoch {}".format(evaluator_u.patience_max, epoch))
+                break
+        
+        # we are doing this as the best model for u and l can be in different epochs, need to modify this later
+        print("best val performance = {}".format(evaluator_u.get_val_best_performance()))
+        # model_u.load_state_dict(evaluator_u.get_best_model())
+
+    # evaluate with final model
+    
+    # naive method eval
+    ts_coverages, ts_inter_widths = mf_conf_eval_naive(val_loaders, test_loaders, model_u_list, model_l_list,
+                 device=DEVICE, params=None, alpha=0.1, standardize=False)
+
+    if config["tune"]:
+        session.report({
+                "mpe": evaluator_u.get_val_best_performance(),
+                "test_coverage": ts_coverages,
+                "test_interval_width": ts_inter_widths
+            })
+        
+        # if config["metric"] == "mse":
+        #     session.report({
+        #         "mse": evaluator.get_val_best_performance(),
+        #         "test_mse": test_performance
+        #     })
+        # else:
+        #     session.report({
+        #         "ndcg": evaluator.get_val_best_performance(),
+        #         "test_ndcg": test_performance[0],
+        #         "test_recall": test_performance[1]
+        #     })
+
+    print("test coverage: {}, interval width: {}, mpe: {}".format(
+        ts_coverages, ts_inter_widths, evaluator_u.get_val_best_performance()))
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    model_name = "mf"
+    if args.tune:
+        config = {
+            "tune": True,
+            "show_log": False,
+            "patience": args.patience,
+            "data_params": args.data_params,
+            "metric": args.metric,
+            "batch_size": args.data_params["batch_size"],
+            "lr_rate": tune.grid_search([5e-5, 1e-5, 1e-3, 5e-4, 1e-4]),
+            # "lr_rate": 5e-4,
+            "epochs": 100,
+            "weight_decay": tune.grid_search([1e-5, 1e-6]),
+            # "weight_decay": 1e-6,
+            "embedding_dim": 64,
+            "seed": args.seed,
+            "topk": args.topk
+        }
+        name_suffix = ""
+        if args.test_seed:
+            name_suffix = "_seed"
+            if args.data_params["name"] == "coat":
+                lr = 5e-4
+                wd = 1e-6
+            elif args.data_params["name"] == "yahoo":
+                lr = 5e-4
+                wd = 1e-5
+            elif args.data_params["name"] == "sim":
+                r_list = args.sim_suffix.split("_")
+                sr = eval(r_list[2])
+                cr = eval(r_list[4])
+                tr = eval(r_list[-1])
+                param = read_best_params(model_name, args.key_name, sr, cr, tr)
+                lr = param["lr"]
+                wd = param["wd"]
+            elif args.data_params["name"] == "kuai_rand":
+                lr = 5e-5
+                wd = 1e-6
+            config["lr_rate"] = lr
+            config["weight_decay"] = wd
+            config["seed"] = tune.grid_search(test_seeds)
+
+        res_name = model_name + name_suffix
+        if args.data_params["name"] == "sim":
+            res_name = res_name + args.sim_suffix
+        tune_param_rating(train_eval, config, args, res_name)
+        
+    else:
+        sample_config = {
+            "metric": args.metric,
+            "data_params": args.data_params,
+            "tune": False,
+            "show_log": True,
+            "patience": args.patience,
+            "lr_rate": 5e-4,
+            "weight_decay": 1e-5,
+            "epochs": 100,
+            "batch_size": args.data_params["batch_size"],
+            "embedding_dim": 64,
+            "topk": args.topk,
+            "seed": args.seed,
+            "n_folds": args.n_folds,
+        }
+
+        train_eval(sample_config)
