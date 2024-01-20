@@ -2,7 +2,7 @@ from torch import nn
 from models.mf import MF
 from torch.utils.data import Dataset, DataLoader
 from utils import *
-from ray.air import session
+# from ray.air import session
 from argparser import *
 from tune_script import *
 from evaluator import Evaluator, mf_evaluate
@@ -15,20 +15,41 @@ import os
 os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
 
 def train_eval(config):
-    metric = config["metric"]
+    print(config)
 
-    val_loaders = []
-    test_loaders = []
+    metric = config["metric"]
+    method = config["method"]
+
+    val_obs_loaders = []
+    val_int_loaders = []
+    test_int_loaders = []
 
     model_u_list = []
     model_l_list = []
 
-    for i in range(config["n_folds"]):
-        train_loader, val_loader, test_loader, evaluation_params, n_users, n_items = construct_naive_mf_dataloader(config, DEVICE)
-        seed_everything(config["seed"]+i)
+    dr_model_list = [] # save density models
 
-        val_loaders.append(val_loader)
-        test_loaders.append(test_loader)
+    for i in range(config["n_folds"]):
+        
+        train_obs_loader, val_obs_loader, train_int_loader, val_int_loader, test_int_loader, evaluation_params, n_users, n_items = construct_wcp_mf_dataloader(
+            config, DEVICE)
+        if method in ["exact", "inexact"]:
+            train_loader = train_obs_loader
+            val_loader = val_obs_loader
+        elif method == "naive":
+            # train_int_loader, val_int_loader, test_int_loader, evaluation_params, n_users, n_items = construct_naive_mf_dataloader(config, DEVICE)
+            # val_obs_loader = None
+            train_loader = train_int_loader
+            val_loader = val_int_loader
+        else:
+            raise ValueError("Unknown method")
+        
+        seed_everything(config["seed"]+i) # make sure each fold is different
+
+        # if val_obs_loader is not None:
+        val_obs_loaders.append(val_obs_loader)
+        val_int_loaders.append(val_int_loader)
+        test_int_loaders.append(test_int_loader)
 
         # two quantile MF regression models, for upper/lower bound
         model_u = MF(n_users, n_items, config["embedding_dim"]).to(DEVICE)
@@ -50,24 +71,23 @@ def train_eval(config):
         evaluator_u = Evaluator("mpe", patience_max=config["patience"])
         evaluator_l = Evaluator("mpe", patience_max=config["patience"])
 
-        evaluator_test_coverage = Evaluator("test_coverage", patience_max=config["patience"])
-        evaluator_test_interval_width = Evaluator("test_interval_width", patience_max=config["patience"])
+        # evaluator_test_coverage = Evaluator("test_coverage", patience_max=config["patience"])
+        # evaluator_test_interval_width = Evaluator("test_interval_width", patience_max=config["patience"])
 
         for epoch in tqdm(range(config["epochs"])):
-            model_u.train()
-            model_l.train()
 
             total_loss_u = 0
             total_loss_l = 0
             total_len = 0
 
             for index, (uid, iid, rating) in enumerate(train_loader):
+                model_u.train()
+                model_l.train()
+                
                 uid, iid, rating = uid.to(DEVICE), iid.to(DEVICE), rating.float().to(DEVICE)
 
                 predict_u = model_u(uid, iid).view(-1)
                 predict_l = model_l(uid, iid).view(-1)
-
-                l2 = torch.tensor([0.])
 
                 loss_u = loss_func_u(predict_u, rating)
                 loss_l = loss_func_l(predict_l, rating)
@@ -92,19 +112,14 @@ def train_eval(config):
 
             # select model by mpe
             validation_performance_u = mf_evaluate("mpe", val_loader, model_u, device=DEVICE,
-                                                params=evaluation_params)
+                                                params=evaluation_params, standardize=config["standardize"])
             
-            # early stopping using model_u's performance only
+            # early stopping using model_u's performance only (not used in current implementation)
             early_stop = evaluator_u.record_val(validation_performance_u, model_u.state_dict())
             
             # TODO: only do conformal after training
 
             if not config["tune"]:
-                # for test performance, we compute coverage and interval length
-                # ts_cover, ts_inter_width = mf_conf_eval(val_loader, test_loader, model_u, model_l, 
-                #     device=DEVICE, params=None, alpha=0.1, standardize=False)
-                # evaluator_test_coverage.record_test(ts_cover)
-                # evaluator_test_interval_width.record_test(ts_inter_width)
                 pass
                 
             if config["show_log"]:
@@ -121,18 +136,52 @@ def train_eval(config):
         print("best val performance = {}".format(evaluator_u.get_val_best_performance()))
         # model_u.load_state_dict(evaluator_u.get_best_model())
 
-    # evaluate with final model
-    
-    # naive method eval
-    ts_coverages, ts_inter_widths = mf_conf_eval_naive(val_loaders, test_loaders, model_u_list, model_l_list,
-                 device=DEVICE, params=None, alpha=0.1, standardize=False)
+        if method == "naive":
+            density_ratio_model = None
 
-    if config["tune"]:
-        session.report({
+        elif method in ["exact", "inexact"]:
+            # train density ratio model after training MF model
+            print("training density ratio model...")
+            # now only uses model_u
+            density_ratio_model = train_density_ratio(train_obs_loader, train_int_loader, 
+                                                    model_u,
+                                                    device=DEVICE, which_model="u",
+                                                    dr_model=config["dr_model"])
+            print("finished training density ratio model")
+        dr_model_list.append(density_ratio_model)
+
+            # evaluate with final model
+    if method in ["exact", "inexact"]:
+        # use val_obs as calibration, test_int as test
+        ts_coverages, ts_inter_widths = mf_conf_eval_splitcp(val_obs_loaders, val_int_loaders, 
+                                                            test_int_loaders, 
+                                                            model_u_list, model_l_list,
+                                                            device=DEVICE, 
+                                                            params=evaluation_params,
+                                                            alpha=0.1, 
+                                                            standardize=config["standardize"],
+                                                                dr_model_list=dr_model_list,
+                                                                exact=config["exact"],
+                                                                dr_model=config["dr_model"])
+        
+    elif method == "naive":
+        ts_coverages, ts_inter_widths = mf_conf_eval_naive(val_int_loaders, test_int_loaders, model_u_list, model_l_list,
+                 device=DEVICE, params=None, alpha=0.1, standardize=config["standardize"])
+
+    results = {
                 "mpe": evaluator_u.get_val_best_performance(),
                 "test_coverage": ts_coverages,
                 "test_interval_width": ts_inter_widths
-            })
+            }
+    
+    print(results)
+
+    # if config["tune"]:
+    #     session.report({
+    #             "mpe": evaluator_u.get_val_best_performance(),
+    #             "test_coverage": ts_coverages,
+    #             "test_interval_width": ts_inter_widths
+    #         })
         
         # if config["metric"] == "mse":
         #     session.report({
@@ -148,7 +197,6 @@ def train_eval(config):
 
     print("test coverage: {}, interval width: {}, mpe: {}".format(
         ts_coverages, ts_inter_widths, evaluator_u.get_val_best_performance()))
-
 
 if __name__ == '__main__':
     args = parse_args()
@@ -214,6 +262,10 @@ if __name__ == '__main__':
             "topk": args.topk,
             "seed": args.seed,
             "n_folds": args.n_folds,
+            # "exact": args.exact,
+            "dr_model":args.dr_model,
+            "standardize":args.standardize,
+            "method": args.method,
         }
 
         train_eval(sample_config)

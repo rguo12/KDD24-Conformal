@@ -13,13 +13,13 @@ coat_params = {
     "ivae_path": dir_prefix + "/iDCF/data_process/coat_ivae/",
     # "test_ratio": 0.7,
     # "train_ratio": 0.8,
-    "test_ratio": 0.25,
-    "train_ratio": 0.5,
+    "test_ratio": 0.5,
+    "train_ratio": 0.25,
     "user_feature_dim": [2, 6, 3, 3, 2, 16, 13, 2],
     "threshold": 4.0,
     "min_val": 1.0,
     "max_val": 5.0,
-    "batch_size": 1024,
+    "batch_size": 512,
     "beta_max": 1.,
     "name": "coat",
 }
@@ -98,7 +98,7 @@ def parse_args():
     parser.add_argument("--exact", type=bool, default=False)
     parser.add_argument("--dr_model", type=str, default="MLP")
     parser.add_argument("--standardize", type=bool, default=True)
-    parser.add_argument("--method", type=str, default="naive")
+    parser.add_argument("--method", type=str, default="inexact")
     
     args = parser.parse_args()
     

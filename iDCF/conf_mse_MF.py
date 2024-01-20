@@ -24,9 +24,8 @@ def train_eval(config):
     val_int_loaders = []
     test_int_loaders = []
 
-    model_u_list = []
-    model_l_list = []
-
+    model_list = []
+    
     dr_model_list = [] # save density models
 
     for i in range(config["n_folds"]):
@@ -52,95 +51,85 @@ def train_eval(config):
         test_int_loaders.append(test_int_loader)
 
         # two quantile MF regression models, for upper/lower bound
-        model_u = MF(n_users, n_items, config["embedding_dim"]).to(DEVICE)
-        model_l = MF(n_users, n_items, config["embedding_dim"]).to(DEVICE)
+        model = MF(n_users, n_items, config["embedding_dim"]).to(DEVICE)
+        # model_l = MF(n_users, n_items, config["embedding_dim"]).to(DEVICE)
 
-        model_u_list.append(model_u)
-        model_l_list.append(model_l)
+        model_list.append(model)
+        # model_l_list.append(model_l)
 
-        optimizer_u = torch.optim.Adam(params=model_u.parameters(), lr=config["lr_rate"], weight_decay=config["weight_decay"])
-        optimizer_l = torch.optim.Adam(params=model_l.parameters(), lr=config["lr_rate"], weight_decay=config["weight_decay"])
+        # optimizer_u = torch.optim.Adam(params=model_u.parameters(), lr=config["lr_rate"], weight_decay=config["weight_decay"])
+        optimizer = torch.optim.Adam(params=model.parameters(), 
+                                     lr=config["lr_rate"], 
+                                     weight_decay=config["weight_decay"])
 
         # loss_func = nn.MSELoss()
-        quantile_u = 0.95  # For upper bound model
-        quantile_l = 0.05  # For lower bound model
+        # quantile_u = 0.95  # For upper bound model
+        # quantile_l = 0.05  # For lower bound model
 
-        loss_func_u = PinballLoss(quantile_u)
-        loss_func_l = PinballLoss(quantile_l)
+        # loss_func_u = PinballLoss(quantile_u)
+        # loss_func_l = PinballLoss(quantile_l)
 
-        evaluator_u = Evaluator("mpe", patience_max=config["patience"])
-        evaluator_l = Evaluator("mpe", patience_max=config["patience"])
+        loss_func = nn.MSELoss()
+
+        evaluator = Evaluator("mse", patience_max=config["patience"])
+        # evaluator_l = Evaluator("mpe", patience_max=config["patience"])
 
         # evaluator_test_coverage = Evaluator("test_coverage", patience_max=config["patience"])
         # evaluator_test_interval_width = Evaluator("test_interval_width", patience_max=config["patience"])
 
         for epoch in tqdm(range(config["epochs"])):
 
-            total_loss_u = 0
-            total_loss_l = 0
+            # total_loss_u = 0
+            total_loss = 0
             total_len = 0
 
             for index, (uid, iid, rating) in enumerate(train_loader):
-                model_u.train()
-                model_l.train()
+                # model_u.train()
+                model.train()
                 
                 uid, iid, rating = uid.to(DEVICE), iid.to(DEVICE), rating.float().to(DEVICE)
 
-                predict_u = model_u(uid, iid).view(-1)
-                predict_l = model_l(uid, iid).view(-1)
+                # predict_u = model_u(uid, iid).view(-1)
+                predict = model(uid, iid).view(-1)
 
-                # l2 = torch.tensor([0.])
+                # loss_u = loss_func_u(predict_u, rating)
+                loss = loss_func(predict, rating)
 
-                loss_u = loss_func_u(predict_u, rating)
-                loss_l = loss_func_l(predict_l, rating)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-                optimizer_u.zero_grad()
-                loss_u.backward()
-                optimizer_u.step()
-
-                optimizer_l.zero_grad()
-                loss_l.backward()
-                optimizer_l.step()
-
-                total_loss_u += loss_u.item() * len(rating)
-                total_loss_l += loss_l.item() * len(rating)
+                total_loss += loss.item() * len(rating)
                 total_len += len(rating)
 
-            evaluator_u.record_training(total_loss_u / total_len)
-            evaluator_l.record_training(total_loss_l / total_len)
+            evaluator.record_training(total_loss / total_len)
 
-            model_u.eval()
-            model_l.eval()
+            model.eval()
 
             # select model by mpe
-            validation_performance_u = mf_evaluate("mpe", val_loader, model_u, device=DEVICE,
+            validation_performance = mf_evaluate("mse", val_loader, model, device=DEVICE,
                                                 params=evaluation_params, standardize=config["standardize"])
             
             # early stopping using model_u's performance only (not used in current implementation)
-            early_stop = evaluator_u.record_val(validation_performance_u, model_u.state_dict())
+            early_stop = evaluator.record_val(validation_performance, model.state_dict())
             
             # TODO: only do conformal after training
 
             if not config["tune"]:
-                # for test performance, we compute coverage and interval length
-                # ts_cover, ts_inter_width = mf_conf_eval(val_loader, test_loader, model_u, model_l, 
-                #     device=DEVICE, params=None, alpha=0.1, standardize=False)
-                # evaluator_test_coverage.record_test(ts_cover)
-                # evaluator_test_interval_width.record_test(ts_inter_width)
                 pass
                 
             if config["show_log"]:
                 # evaluator_test_coverage.epoch_log(epoch)
                 # evaluator_test_interval_width.epoch_log(epoch)
-                evaluator_u.epoch_log(epoch)
+                evaluator.epoch_log(epoch)
 
             if early_stop:
                 if config["show_log"]:
-                    print("reach max patience {}, current epoch {}".format(evaluator_u.patience_max, epoch))
+                    print("reach max patience {}, current epoch {}".format(evaluator.patience_max, epoch))
                 break
         
         # we are doing this as the best model for u and l can be in different epochs, need to modify this later
-        print("best val performance = {}".format(evaluator_u.get_val_best_performance()))
+        print("best val performance = {}".format(evaluator.get_val_best_performance()))
         # model_u.load_state_dict(evaluator_u.get_best_model())
 
         if method == "naive":
@@ -150,8 +139,8 @@ def train_eval(config):
             # train density ratio model after training MF model
             print("training density ratio model...")
             density_ratio_model = train_density_ratio(train_obs_loader, train_int_loader, 
-                                                    model_u, model_l,
-                                                    device=DEVICE, which_model="u",
+                                                    model,
+                                                    device=DEVICE,
                                                     dr_model=config["dr_model"])
             print("finished training density ratio model")
         dr_model_list.append(density_ratio_model)
@@ -159,28 +148,29 @@ def train_eval(config):
             # evaluate with final model
     if method in ["exact", "inexact"]:
         # use val_obs as calibration, test_int as test
-        ts_coverages, ts_inter_widths = mf_conf_eval_splitcp(val_obs_loaders, val_int_loaders, 
+        ts_coverages, ts_inter_widths = mf_conf_eval_splitcp_mse(val_obs_loaders,
+                                                             val_int_loaders, 
                                                             test_int_loaders, 
-                                                            model_u_list, model_l_list,
+                                                            model_list,
+                                                            dr_model_list,
                                                             device=DEVICE, 
                                                             params=evaluation_params,
                                                             alpha=0.1, 
                                                             standardize=config["standardize"],
-                                                                dr_model_list=dr_model_list,
                                                                 exact=config["exact"],
                                                                 dr_model=config["dr_model"])
         
     elif method == "naive":
-        ts_coverages, ts_inter_widths = mf_conf_eval_naive(val_int_loaders, test_int_loaders, model_u_list, model_l_list,
-                 device=DEVICE, params=None, alpha=0.1, standardize=False)
+        ts_coverages, ts_inter_widths = mf_conf_eval_naive_mse(val_int_loaders, test_int_loaders, model_list,
+                 device=DEVICE, params=evaluation_params, alpha=0.1, standardize=config["standardize"])
 
     results = {
-                "mpe": evaluator_u.get_val_best_performance(),
+                "mpe": evaluator.get_val_best_performance(),
                 "test_coverage": ts_coverages,
                 "test_interval_width": ts_inter_widths
             }
     
-    print(results)
+    # print(results)
 
     # if config["tune"]:
     #     session.report({
@@ -202,7 +192,7 @@ def train_eval(config):
         #     })
 
     print("test coverage: {}, interval width: {}, mpe: {}".format(
-        ts_coverages, ts_inter_widths, evaluator_u.get_val_best_performance()))
+        ts_coverages, ts_inter_widths, evaluator.get_val_best_performance()))
 
 if __name__ == '__main__':
     args = parse_args()
@@ -261,8 +251,8 @@ if __name__ == '__main__':
             "show_log": True,
             "patience": args.patience,
             "lr_rate": 5e-4,
-            "weight_decay": 1e-5,
-            "epochs": 5,
+            "weight_decay": 1e-6,
+            "epochs": 100,
             "batch_size": args.data_params["batch_size"],
             "embedding_dim": 64,
             "topk": args.topk,
