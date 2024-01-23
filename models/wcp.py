@@ -251,6 +251,7 @@ class WCP:
             
                 weights_calib_0, weights_test_0, scores_0 = utils.weights_and_scores(weight_fn_0, X_calib_fold_two_1, X_calib_fold_one_0, Y_calib_fold_one_0, 
                                                                                Y0_calib_hat_l, Y0_calib_hat_u, self.pscores_models[i])
+                
                 offset_0 = utils.weighted_conformal(alpha, weights_calib_0, weights_test_0, scores_0)
 
                 # ==================== Debug code ====================
@@ -351,7 +352,8 @@ class WCP:
                 C_u = np.concatenate((C1_u, C0_u))[dummy_index]
                 X = np.concatenate((X_calib_fold_two_0, X_calib_fold_two_1))[dummy_index, :]
                 
-                X_train, X_calib, C_l_train, C_l_calib, C_u_train, C_u_calib = train_test_split(X, C_l, C_u, test_size=0.25, random_state=42)
+                X_train, X_calib, C_l_train, C_l_calib, C_u_train, C_u_calib = train_test_split(
+                    X, C_l, C_u, test_size=0.25, random_state=42)
 
                 self.tilde_C_ITE_model_l[i].fit(X_train, C_l_train)                                                
                 self.tilde_C_ITE_model_u[i].fit(X_train, C_u_train)

@@ -2,6 +2,7 @@ from torch import nn
 from models.mf import MF
 from torch.utils.data import Dataset, DataLoader
 from utils import *
+from conformal import *
 # from ray.air import session
 from argparser import *
 from tune_script import *
@@ -27,6 +28,9 @@ def train_eval(config):
     model_list = []
     
     dr_model_list = [] # save density models
+
+    random_number = random.randint(1000, 9999)
+
 
     for i in range(config["n_folds"]):
         
@@ -148,6 +152,10 @@ def train_eval(config):
             # evaluate with final model
     if method in ["exact", "inexact"]:
         # use val_obs as calibration, test_int as test
+        if method == "exact":
+            exact = True
+        else:
+            exact = False
         ts_coverages, ts_inter_widths = mf_conf_eval_splitcp_mse(val_obs_loaders,
                                                              val_int_loaders, 
                                                             test_int_loaders, 
@@ -157,18 +165,30 @@ def train_eval(config):
                                                             params=evaluation_params,
                                                             alpha=0.1, 
                                                             standardize=config["standardize"],
-                                                                exact=config["exact"],
+                                                                exact=exact,
                                                                 dr_model=config["dr_model"])
         
     elif method == "naive":
         ts_coverages, ts_inter_widths = mf_conf_eval_naive_mse(val_int_loaders, test_int_loaders, model_list,
                  device=DEVICE, params=evaluation_params, alpha=0.1, standardize=config["standardize"])
 
-    results = {
-                "mpe": evaluator.get_val_best_performance(),
-                "test_coverage": ts_coverages,
-                "test_interval_width": ts_inter_widths
+    for i in range(len(ts_coverages)):
+        results = {
+            "method": config["method"],
+            "test_coverage": ts_coverages[i],
+            "test_interval_width": ts_inter_widths[i],
+            "mse": evaluator.get_val_best_performance(),
+            "n_train_obs": config['n_train_obs'],
+            "n_val_obs": config['n_val_obs'],
+            "n_train_int": config['n_train_int'],
+            "n_val_int": config['n_val_int'],
+            "n_test_int": config['n_test_int'],
             }
+
+        run_name = f"{random_number}_{config['method']}_{config['dr_model']}_seed_{config['seed']}"
+
+        save_rec_results(config, results, run_name)
+    
     
     # print(results)
 
@@ -191,77 +211,85 @@ def train_eval(config):
         #         "test_recall": test_performance[1]
         #     })
 
-    print("test coverage: {}, interval width: {}, mpe: {}".format(
+    print("test coverage: {}, interval width: {}, best val mse: {}".format(
         ts_coverages, ts_inter_widths, evaluator.get_val_best_performance()))
 
 if __name__ == '__main__':
     args = parse_args()
     model_name = "mf"
-    if args.tune:
-        config = {
-            "tune": True,
-            "show_log": False,
-            "patience": args.patience,
-            "data_params": args.data_params,
-            "metric": args.metric,
-            "batch_size": args.data_params["batch_size"],
-            "lr_rate": tune.grid_search([5e-5, 1e-5, 1e-3, 5e-4, 1e-4]),
-            # "lr_rate": 5e-4,
-            "epochs": 100,
-            "weight_decay": tune.grid_search([1e-5, 1e-6]),
-            # "weight_decay": 1e-6,
-            "embedding_dim": 64,
-            "seed": args.seed,
-            "topk": args.topk
-        }
-        name_suffix = ""
-        if args.test_seed:
-            name_suffix = "_seed"
-            if args.data_params["name"] == "coat":
-                lr = 5e-4
-                wd = 1e-6
-            elif args.data_params["name"] == "yahoo":
-                lr = 5e-4
-                wd = 1e-5
-            elif args.data_params["name"] == "sim":
-                r_list = args.sim_suffix.split("_")
-                sr = eval(r_list[2])
-                cr = eval(r_list[4])
-                tr = eval(r_list[-1])
-                param = read_best_params(model_name, args.key_name, sr, cr, tr)
-                lr = param["lr"]
-                wd = param["wd"]
-            elif args.data_params["name"] == "kuai_rand":
-                lr = 5e-5
-                wd = 1e-6
-            config["lr_rate"] = lr
-            config["weight_decay"] = wd
-            config["seed"] = tune.grid_search(test_seeds)
+    # if args.tune:
+    #     config = {
+    #         "tune": True,
+    #         "show_log": False,
+    #         "patience": args.patience,
+    #         "data_params": args.data_params,
+    #         "metric": args.metric,
+    #         "batch_size": args.data_params["batch_size"],
+    #         "lr_rate": tune.grid_search([5e-5, 1e-5, 1e-3, 5e-4, 1e-4]),
+    #         # "lr_rate": 5e-4,
+    #         "epochs": 100,
+    #         "weight_decay": tune.grid_search([1e-5, 1e-6]),
+    #         # "weight_decay": 1e-6,
+    #         "embedding_dim": 64,
+    #         "seed": args.seed,
+    #         "topk": args.topk
+    #     }
+    #     name_suffix = ""
+    #     if args.test_seed:
+    #         name_suffix = "_seed"
+    #         if args.data_params["name"] == "coat":
+    #             lr = 5e-4
+    #             wd = 1e-6
+    #         elif args.data_params["name"] == "yahoo":
+    #             lr = 5e-4
+    #             wd = 1e-5
+    #         elif args.data_params["name"] == "sim":
+    #             r_list = args.sim_suffix.split("_")
+    #             sr = eval(r_list[2])
+    #             cr = eval(r_list[4])
+    #             tr = eval(r_list[-1])
+    #             param = read_best_params(model_name, args.key_name, sr, cr, tr)
+    #             lr = param["lr"]
+    #             wd = param["wd"]
+    #         elif args.data_params["name"] == "kuai_rand":
+    #             lr = 5e-5
+    #             wd = 1e-6
+    #         config["lr_rate"] = lr
+    #         config["weight_decay"] = wd
+    #         config["seed"] = tune.grid_search(test_seeds)
 
-        res_name = model_name + name_suffix
-        if args.data_params["name"] == "sim":
-            res_name = res_name + args.sim_suffix
-        tune_param_rating(train_eval, config, args, res_name)
+    #     res_name = model_name + name_suffix
+    #     if args.data_params["name"] == "sim":
+    #         res_name = res_name + args.sim_suffix
+    #     tune_param_rating(train_eval, config, args, res_name)
         
-    else:
-        sample_config = {
-            "metric": args.metric,
-            "data_params": args.data_params,
-            "tune": False,
-            "show_log": True,
-            "patience": args.patience,
-            "lr_rate": 5e-4,
-            "weight_decay": 1e-6,
-            "epochs": 100,
-            "batch_size": args.data_params["batch_size"],
-            "embedding_dim": 64,
-            "topk": args.topk,
-            "seed": args.seed,
-            "n_folds": args.n_folds,
-            "exact": args.exact,
-            "dr_model":args.dr_model,
-            "standardize":args.standardize,
-            "method": args.method,
-        }
+    # else:
 
-        train_eval(sample_config)
+    sample_config = {
+        "metric": args.metric,
+        "data_params": args.data_params,
+        "tune": False,
+        "show_log": True,
+        "patience": args.patience,
+        "lr_rate": 5e-4,
+        "weight_decay": 1e-6,
+        "epochs": 200,
+        "batch_size": args.data_params["batch_size"],
+        "embedding_dim": 64,
+        "topk": args.topk,
+        "seed": args.seed,
+        "n_folds": args.n_folds,
+        "exact": args.exact,
+        "dr_model":args.dr_model,
+        "standardize":args.standardize,
+        "method": args.method,
+        "save_path": args.save_path,
+    }
+
+    sample_config["data_params"]["test_ratio"] = args.test_ratio
+    sample_config["data_params"]["train_ratio"] = args.train_ratio
+
+    sample_config["data_params"]["obs_test_ratio"] = args.obs_test_ratio
+    sample_config["data_params"]["obs_train_ratio"] = args.obs_train_ratio
+
+    train_eval(sample_config)

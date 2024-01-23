@@ -13,8 +13,6 @@ coat_params = {
     "ivae_path": dir_prefix + "/iDCF/data_process/coat_ivae/",
     # "test_ratio": 0.7,
     # "train_ratio": 0.8,
-    "test_ratio": 0.5,
-    "train_ratio": 0.25,
     "user_feature_dim": [2, 6, 3, 3, 2, 16, 13, 2],
     "threshold": 4.0,
     "min_val": 1.0,
@@ -25,15 +23,15 @@ coat_params = {
 }
 
 yahoo_params = {
-    "train_path": dir_prefix + "/data_process/Yahoo_R3/train.csv",
-    "random_path": dir_prefix + "/data_process/Yahoo_R3/random.csv",
-    "user_feature_path": dir_prefix + "/data_process/Yahoo_R3/user_feat_onehot.csv",
-    "user_feature_label": dir_prefix + "/data_process/Yahoo_R3/user_feat_label.csv",
-    "dcf_A_hat_path": dir_prefix + "/data_process/R3_wg_Afit/",
-    "ivae_path": dir_prefix + "/data_process/yahoo_ivae/",
-    "vae_path": dir_prefix + "/data_process/yahoo_vae/",
-    "test_ratio": 0.7,
-    "train_ratio": 0.8,
+    "train_path": dir_prefix + "/iDCF/data_process/Yahoo_R3/train.csv",
+    "random_path": dir_prefix + "/iDCF/data_process/Yahoo_R3/random.csv",
+    "user_feature_path": dir_prefix + "/iDCF/data_process/Yahoo_R3/user_feat_onehot.csv",
+    "user_feature_label": dir_prefix + "/iDCF/data_process/Yahoo_R3/user_feat_label.csv",
+    "dcf_A_hat_path": dir_prefix + "/iDCF/data_process/R3_wg_Afit/",
+    "ivae_path": dir_prefix + "/iDCF/data_process/yahoo_ivae/",
+    "vae_path": dir_prefix + "/iDCF/data_process/yahoo_vae/",
+    # "test_ratio": 0.7,
+    # "train_ratio": 0.8,
     "user_feature_dim": [5, 5, 5, 5, 5, 5, 5],
     "threshold": 4.0,
     "min_val": 1.0,
@@ -85,8 +83,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir_prefix", type=str, default=dir_prefix)
     parser.add_argument("--tune", action="store_true")
-    parser.add_argument("--metric", type=str, default="mpe", help="[mpe, mse, ndcg]")
-    parser.add_argument("--dataset", type=str, default="coat")
+    parser.add_argument("--metric", type=str, default="mse", help="[mpe, mse, ndcg]")
+    parser.add_argument("--dataset", type=str, default="yahoo")
     parser.add_argument("--patience", type=int, default=20)
     parser.add_argument("--topk", type=int, default=5)
     parser.add_argument("--seed", type=int, default=1234)
@@ -96,9 +94,17 @@ def parse_args():
     
     parser.add_argument("--n_folds", type=int, default=1)
     parser.add_argument("--exact", type=bool, default=False)
-    parser.add_argument("--dr_model", type=str, default="MLP")
+    parser.add_argument("--dr_model", type=str, default="DR")
     parser.add_argument("--standardize", type=bool, default=True)
-    parser.add_argument("--method", type=str, default="inexact")
+    parser.add_argument("--method", type=str, default="naive")
+
+    parser.add_argument("--test_ratio", type=float, default=0.5, help="int data")
+    parser.add_argument("--train_ratio", type=float, default=0.25, help="int data")
+
+    parser.add_argument("--obs_test_ratio", type=float, default=0.005)
+    parser.add_argument("--obs_train_ratio", type=float, default=0.8)
+
+    parser.add_argument("--save_path", type=str, default="results/")
     
     args = parser.parse_args()
     
