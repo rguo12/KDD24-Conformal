@@ -227,3 +227,11 @@ def plot_tsne(X_calib, X_test, j, dataset='ihdp', T=0, fig_name:str="featdist"):
 # Example usage:
 # Replace X_calib_j, X_test, and feature_name with your actual data and feature name.
 # plot_tsne(X_calib_j, X_test, 'Your_Feature_Name')
+
+
+def eval_po(Y1,Y0,C0_l,C0_u,C1_l,C1_u):
+    coverage_0 = np.mean((Y0 >= C0_l) & (Y0 <= C0_u))
+    coverage_1 = np.mean((Y1 >= C1_l) & (Y1 <= C1_u))
+    interval_width_0 = np.mean(np.abs(C0_u - C0_l))
+    interval_width_1 = np.mean(np.abs(C1_u - C1_l))
+    return coverage_0, coverage_1, interval_width_0, interval_width_1

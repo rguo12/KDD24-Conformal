@@ -8,19 +8,20 @@ from datetime import datetime
 import random
 
 def get_config():
-    parser = argparse.ArgumentParser(description='Transductive Conformal Prediction')
+    parser = argparse.ArgumentParser(
+        description='Transductive Conformal Prediction')
 
     # Data settings
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--save_path', type=str, default='./results')
     parser.add_argument('--debug', type=bool, default=True)
-    parser.add_argument('--dataset', type=str, default='ihdp')
+    parser.add_argument('--dataset', type=str, default='cevae')
 
-    parser.add_argument('--n_folds', type=int, default=3)
+    parser.add_argument('--n_folds', type=int, default=2)
     parser.add_argument('--test_frac', type=float, default=0.2)
-    parser.add_argument('--n_inter_min', type=int, default=100)
-    parser.add_argument('--n_inter_max', type=int, default=500)
-    parser.add_argument('--n_inter_gap', type=int, default=100)
+    parser.add_argument('--n_inter_min', type=int, default=200)
+    parser.add_argument('--n_inter_max', type=int, default=1000)
+    parser.add_argument('--n_inter_gap', type=int, default=200)
 
     # parser.add_argument('--n_obs_max', type=list, default=10000)
     # parser.add_argument('--n_obs_min', type=list, default=1000)
@@ -34,7 +35,7 @@ def get_config():
 
     # Model settings
     # parser.add_argument('--methods', type=list, default=['TCP'])
-    parser.add_argument('--methods', type=list, default=['naive', 'TCP', 'exact', 'inexact', 'weighted CP'])
+    parser.add_argument('--methods', type=list, default=['naive', 'exact', 'inexact', 'weighted CP'])
 
     parser.add_argument('--base_learner', type=str, default="GBM")
     parser.add_argument('--density_ratio_model', type=str, default="MLP")

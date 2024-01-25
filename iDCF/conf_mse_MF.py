@@ -31,7 +31,6 @@ def train_eval(config):
 
     random_number = random.randint(1000, 9999)
 
-
     for i in range(config["n_folds"]):
         
         train_obs_loader, val_obs_loader, train_int_loader, val_int_loader, test_int_loader, evaluation_params, n_users, n_items = construct_wcp_mf_dataloader(
@@ -39,11 +38,13 @@ def train_eval(config):
         if method in ["exact", "inexact"]:
             train_loader = train_obs_loader
             val_loader = val_obs_loader
+
         elif method == "naive":
             # train_int_loader, val_int_loader, test_int_loader, evaluation_params, n_users, n_items = construct_naive_mf_dataloader(config, DEVICE)
             # val_obs_loader = None
             train_loader = train_int_loader
             val_loader = val_int_loader
+            
         else:
             raise ValueError("Unknown method")
         
@@ -146,7 +147,9 @@ def train_eval(config):
                                                     model,
                                                     device=DEVICE,
                                                     dr_model=config["dr_model"])
+            
             print("finished training density ratio model")
+            
         dr_model_list.append(density_ratio_model)
 
             # evaluate with final model

@@ -1,5 +1,4 @@
-# Copyright (c) 2023, Ahmed Alaa
-# Licensed under the BSD 3-clause license (see LICENSE.txt)
+# partially based on code from Ahmed Alaa et al.
 
 from __future__ import absolute_import, division, print_function
 
@@ -22,7 +21,7 @@ if not sys.warnoptions:
 # Global options for baselearners (see class attributes below)
 
 base_learners_dict = dict({"GBM": GradientBoostingRegressor, 
-                           "QRF": RandomForestQuantileRegressor})
+                           "RF": RandomForestQuantileRegressor})
 
 
 class WCP:
@@ -54,11 +53,12 @@ class WCP:
         if self.base_learner == "GBM":
             first_CQR_args_u = dict({"loss": "quantile", "alpha":1 - (self.alpha / 2), "n_estimators": n_estimators_target}) 
             first_CQR_args_l = dict({"loss": "quantile", "alpha":self.alpha/2, "n_estimators": n_estimators_target}) 
-        elif self.base_learner == "QRF":
+        elif self.base_learner == "RF":
             first_CQR_args_u = dict({"default_quantiles":1 - (self.alpha/2), "n_estimators": n_estimators_target})
             first_CQR_args_l = dict({"default_quantiles":self.alpha/2, "n_estimators": n_estimators_target})
         else:
-            raise ValueError('base_learner must be one of GBM, QRF')
+            raise ValueError('base_learner must be one of GBM, RF')
+        
         self.models_u_0 = [base_learners_dict[self.base_learner](**first_CQR_args_u) for _ in range(self.n_folds)]
         self.models_l_0 = [base_learners_dict[self.base_learner](**first_CQR_args_l) for _ in range(self.n_folds)] 
         self.models_u_1 = [base_learners_dict[self.base_learner](**first_CQR_args_u) for _ in range(self.n_folds)]
@@ -69,7 +69,7 @@ class WCP:
         if self.base_learner == "GBM":
             second_CQR_args_u = dict({"loss": "quantile", "alpha":0.6, "n_estimators": n_estimators_target})
             second_CQR_args_l = dict({"loss": "quantile", "alpha":0.4, "n_estimators": n_estimators_target})
-        elif self.base_learner == "QRF":
+        elif self.base_learner == "RF":
             second_CQR_args_u = dict({"default_quantiles":0.6, "n_estimators": n_estimators_target}) 
             second_CQR_args_l = dict({"default_quantiles":0.4, "n_estimators": n_estimators_target})
         
@@ -96,6 +96,19 @@ class WCP:
             self.Y_calib_obs_list.append(data_obs.loc[self.calib_obs_index_list[i]]['Y'].values)
 
         return
+
+    def reset_tilde_C_ITE_models(self):
+
+        n_estimators_target = 100
+        if self.base_learner == "GBM":
+            second_CQR_args_u = dict({"loss": "quantile", "alpha":0.6, "n_estimators": n_estimators_target})
+            second_CQR_args_l = dict({"loss": "quantile", "alpha":0.4, "n_estimators": n_estimators_target})
+        elif self.base_learner == "RF":
+            second_CQR_args_u = dict({"default_quantiles":0.6, "n_estimators": n_estimators_target}) 
+            second_CQR_args_l = dict({"default_quantiles":0.4, "n_estimators": n_estimators_target})
+        
+        self.tilde_C_ITE_model_u = [base_learners_dict[self.base_learner](**second_CQR_args_u) for _ in range(self.n_folds)] 
+        self.tilde_C_ITE_model_l = [base_learners_dict[self.base_learner](**second_CQR_args_l) for _ in range(self.n_folds)] 
 
     def fit(self):
         """
@@ -164,7 +177,7 @@ class WCP:
         pause = True
         return [y0_l, y0_u], [y1_l, y1_u]
     
-    def predict_ITE(self, alpha, X_test, method='naive'):
+    def predict_ITE(self, alpha, X_test, C0, C1, ite_method='naive', cf_method='WCP'):
         """
         Interval-valued prediction of ITEs
 
@@ -173,11 +186,11 @@ class WCP:
         outputs >> point estimate, lower bound and upper bound
 
         """
-        if method == 'naive':
-            C0, C1 = self.predict_counterfactuals(alpha, X_test)
+        if ite_method == 'naive':
+            # C0, C1 = self.predict_counterfactuals(alpha, X_test)
             return C1[0] - C0[1], C1[1] - C0[0]
         
-        elif method == 'nested_inexact':
+        elif ite_method == 'inexact':
             CI_ITE_l_list, CI_ITE_u_list = [], []
             for i in range(self.n_folds):
                 CI_ITE_l = self.tilde_C_ITE_model_l[i].predict(X_test)
@@ -188,7 +201,7 @@ class WCP:
             CI_ITE_u = np.median(np.array(CI_ITE_u_list), axis=0)
             return CI_ITE_l, CI_ITE_u
         
-        elif method == 'nested_exact':
+        elif ite_method == 'exact':
             CI_ITE_l_list, CI_ITE_u_list = [], []
             for i in range(self.n_folds):
                 CI_ITE_l = self.tilde_C_ITE_model_l[i].predict(X_test) - self.offset_list[i]
@@ -202,44 +215,59 @@ class WCP:
             raise ValueError('method must be one of naive, nested_inexact, nested_exact')
 
 
-    def conformalize(self, alpha, method='naive'):
+    def conformalize(self, alpha, ite_method='naive'):
         """
         Calibrate the predictions of the meta-learner using standard conformal prediction
 
         """
         
-        if method == 'naive':   
+        if ite_method == 'naive':   
             # Nothing needs to be done.
             pass
         
-        elif method == 'nested_inexact': 
-            for i in range(self.n_folds): 
+        elif ite_method == 'inexact': 
+            for i in range(self.n_folds):
+                # calib obs data
                 X_calib_0 = self.X_calib_obs_list[i][self.T_calib_obs_list[i]==0, :]
                 X_calib_1 = self.X_calib_obs_list[i][self.T_calib_obs_list[i]==1, :]
                 Y_calib_0 = self.Y_calib_obs_list[i][self.T_calib_obs_list[i]==0]
                 Y_calib_1 = self.Y_calib_obs_list[i][self.T_calib_obs_list[i]==1]
 
-                calib_data = self.data_obs.loc[self.calib_index_list[i]]
-                Y1_calib_0 = calib_data[calib_data['T'] == 0]['Y1'].values
-                Y0_calib_1 = calib_data[calib_data['T'] == 1]['Y0'].values
+                # calib_data = self.data_obs.loc[self.calib_index_list[i]]
+                # for those T=0, we take its Y1.
+                # Y1_calib_0 = calib_data[calib_data['T'] == 0]['Y1'].values
+                # for those T=1, we take its Y0.
+                # Y0_calib_1 = calib_data[calib_data['T'] == 1]['Y0'].values
 
                 # X_calib_fold_one_0, X_calib_fold_two_0, Y_calib_fold_one_0, Y_calib_fold_two_0 = train_test_split(X_calib_0, Y_calib_0, index_0, test_size=0.5, random_state=42)
                 # X_calib_fold_one_1, X_calib_fold_two_1, Y_calib_fold_one_1, Y_calib_fold_two_1 = train_test_split(X_calib_1, Y_calib_1, index_1, test_size=0.5, random_state=42)
                 
-                X_calib_fold_one_0, X_calib_fold_two_0, Y_calib_fold_one_0, Y_calib_fold_two_0, Y1_calib_fold_one_0, Y1_calib_fold_two_0 = train_test_split(X_calib_0, Y_calib_0, Y1_calib_0, test_size=0.5, random_state=42)
-                X_calib_fold_one_1, X_calib_fold_two_1, Y_calib_fold_one_1, Y_calib_fold_two_1, Y0_calib_fold_one_1, Y0_calib_fold_two_1 = train_test_split(X_calib_1, Y_calib_1, Y0_calib_1, test_size=0.5, random_state=42)
+                # split calib obs data into two
+                # X_calib_fold_one_0, X_calib_fold_two_0, Y_calib_fold_one_0, Y_calib_fold_two_0, Y1_calib_fold_one_0, Y1_calib_fold_two_0 = train_test_split(X_calib_0, Y_calib_0, Y1_calib_0, test_size=0.5, random_state=42)
+                # X_calib_fold_one_1, X_calib_fold_two_1, Y_calib_fold_one_1, Y_calib_fold_two_1, Y0_calib_fold_one_1, Y0_calib_fold_two_1 = train_test_split(X_calib_1, Y_calib_1, Y0_calib_1, test_size=0.5, random_state=42)
 
+                X_calib_fold_one_0, X_calib_fold_two_0, Y_calib_fold_one_0, Y_calib_fold_two_0  = train_test_split(X_calib_0, Y_calib_0, test_size=0.5, random_state=42)
+                X_calib_fold_one_1, X_calib_fold_two_1, Y_calib_fold_one_1, Y_calib_fold_two_1 = train_test_split(X_calib_1, Y_calib_1, test_size=0.5, random_state=42)
+
+                # predict upper lower bounds for fold 1 using main quantile regression models
                 Y1_calib_hat_u = self.models_u_1[i].predict(X_calib_fold_one_1)
                 Y1_calib_hat_l = self.models_l_1[i].predict(X_calib_fold_one_1)
                 
+                # get weighted conformal offset for the cf outcome on fold 2 (X_test is X_calib_fold_two_1 and X_calib_fold_two_0)
                 def weight_fn_1(pscores_models, x):
                     pscores = pscores_models.predict_proba(x)[:, 1]
                     return (1.0 - pscores) / pscores
-            
-                weights_calib_1, weights_test_1, scores_1 = utils.weights_and_scores(weight_fn_1, X_calib_fold_two_0, X_calib_fold_one_1, 
+
+                # reweight scores of the treated to get offset of controlled
+                weights_calib_1, weights_test_1, scores_1 = utils.weights_and_scores(weight_fn_1,
+                                                                                     X_calib_fold_two_0, 
+                                                                                     X_calib_fold_one_1, 
                                                                                      Y_calib_fold_one_1, 
-                                                                                     Y1_calib_hat_l, Y1_calib_hat_u, self.pscores_models[i])
-            
+                                                                                     Y1_calib_hat_l, 
+                                                                                     Y1_calib_hat_u, 
+                                                                                     self.pscores_models[i])
+
+                # offset for the counterfactual outcome for the controlled group (fold 2)
                 offset_1 = utils.weighted_conformal(alpha, weights_calib_1, weights_test_1, scores_1)
             
                 Y0_calib_hat_u = self.models_u_0[i].predict(X_calib_fold_one_0)
@@ -252,6 +280,7 @@ class WCP:
                 weights_calib_0, weights_test_0, scores_0 = utils.weights_and_scores(weight_fn_0, X_calib_fold_two_1, X_calib_fold_one_0, Y_calib_fold_one_0, 
                                                                                Y0_calib_hat_l, Y0_calib_hat_u, self.pscores_models[i])
                 
+                # offset for the counterfactual outcome for the treated group (fold 2)
                 offset_0 = utils.weighted_conformal(alpha, weights_calib_0, weights_test_0, scores_0)
 
                 # ==================== Debug code ====================
@@ -265,13 +294,14 @@ class WCP:
                 # print('Debug: Coverage of Y(0) on second fold of calibration Y|T=0', coverage_0)
                 # pause = True
 
+                # compute ITE
                 # This is second line in Table 3 of Lei and Candes
-                # Note that C1 is for the control group
+                # Note that C1 is for the fold 2 of control group
                 C1_u = (self.models_u_1[i].predict(X_calib_fold_two_0) + offset_1) - Y_calib_fold_two_0
                 C1_l = (self.models_l_1[i].predict(X_calib_fold_two_0) - offset_1) - Y_calib_fold_two_0
                 
                 # This is first line in Table 3 of Lei and Candes
-                # Note that C0 is for the control group
+                # Note that C0 is for fold 2 of the treated group
                 C0_u = Y_calib_fold_two_1 - (self.models_l_0[i].predict(X_calib_fold_two_1) - offset_0)
                 C0_l = Y_calib_fold_two_1 - (self.models_u_0[i].predict(X_calib_fold_two_1) + offset_0)
 
@@ -283,7 +313,7 @@ class WCP:
                                             np.concatenate((C1_u, C0_u))[dummy_index])
                 pause = True
 
-        elif method == 'nested_exact':
+        elif ite_method == 'exact':
             self.offset_list = []
             for i in range(self.n_folds):
                 X_calib_0 = self.X_calib_obs_list[i][self.T_calib_obs_list[i]==0, :]
@@ -291,15 +321,17 @@ class WCP:
                 Y_calib_0 = self.Y_calib_obs_list[i][self.T_calib_obs_list[i]==0]
                 Y_calib_1 = self.Y_calib_obs_list[i][self.T_calib_obs_list[i]==1]
 
-                calib_data = self.data_obs.loc[self.calib_index_list[i]]
-                Y1_calib_0 = calib_data[calib_data['T'] == 0]['Y1'].values
-                Y0_calib_1 = calib_data[calib_data['T'] == 1]['Y0'].values
+                # calib_data = self.data_obs.loc[self.calib_index_list[i]]
+                # Y1_calib_0 = calib_data[calib_data['T'] == 0]['Y1'].values
+                # Y0_calib_1 = calib_data[calib_data['T'] == 1]['Y0'].values
 
                 # X_calib_fold_one_0, X_calib_fold_two_0, Y_calib_fold_one_0, Y_calib_fold_two_0 = train_test_split(X_calib_0, Y_calib_0, index_0, test_size=0.5, random_state=42)
                 # X_calib_fold_one_1, X_calib_fold_two_1, Y_calib_fold_one_1, Y_calib_fold_two_1 = train_test_split(X_calib_1, Y_calib_1, index_1, test_size=0.5, random_state=42)
                 
-                X_calib_fold_one_0, X_calib_fold_two_0, Y_calib_fold_one_0, Y_calib_fold_two_0, Y1_calib_fold_one_0, Y1_calib_fold_two_0 = train_test_split(X_calib_0, Y_calib_0, Y1_calib_0, test_size=0.5, random_state=42)
-                X_calib_fold_one_1, X_calib_fold_two_1, Y_calib_fold_one_1, Y_calib_fold_two_1, Y0_calib_fold_one_1, Y0_calib_fold_two_1 = train_test_split(X_calib_1, Y_calib_1, Y0_calib_1, test_size=0.5, random_state=42)
+                # X_calib_fold_one_0, X_calib_fold_two_0, Y_calib_fold_one_0, Y_calib_fold_two_0, Y1_calib_fold_one_0, Y1_calib_fold_two_0 = train_test_split(X_calib_0, Y_calib_0, Y1_calib_0, test_size=0.5, random_state=42)
+                # X_calib_fold_one_1, X_calib_fold_two_1, Y_calib_fold_one_1, Y_calib_fold_two_1, Y0_calib_fold_one_1, Y0_calib_fold_two_1 = train_test_split(X_calib_1, Y_calib_1, Y0_calib_1, test_size=0.5, random_state=42)
+                X_calib_fold_one_0, X_calib_fold_two_0, Y_calib_fold_one_0, Y_calib_fold_two_0 = train_test_split(X_calib_0, Y_calib_0, test_size=0.5, random_state=42)
+                X_calib_fold_one_1, X_calib_fold_two_1, Y_calib_fold_one_1, Y_calib_fold_two_1 = train_test_split(X_calib_1, Y_calib_1, test_size=0.5, random_state=42)
 
                 Y1_calib_hat_u = self.models_u_1[i].predict(X_calib_fold_one_1)
                 Y1_calib_hat_l = self.models_l_1[i].predict(X_calib_fold_one_1)
@@ -350,7 +382,8 @@ class WCP:
 
                 C_l = np.concatenate((C1_l, C0_l))[dummy_index]
                 C_u = np.concatenate((C1_u, C0_u))[dummy_index]
-                X = np.concatenate((X_calib_fold_two_0, X_calib_fold_two_1))[dummy_index, :]
+                X = np.concatenate((X_calib_fold_two_0,
+                                     X_calib_fold_two_1))[dummy_index, :]
                 
                 X_train, X_calib, C_l_train, C_l_calib, C_u_train, C_u_calib = train_test_split(
                     X, C_l, C_u, test_size=0.25, random_state=42)
