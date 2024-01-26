@@ -414,6 +414,7 @@ def construct_wcp_mf_dataloader(config, device, require_index=False):
 
     data_params = config["data_params"]
     standardize = config["standardize"]
+    method = config["method"]
 
     # naive method only use randomized data for tr/cal/ts
     # train_mat, val_mat, test_mat = construct_rating_dataset(data_params["train_path"],
@@ -432,18 +433,6 @@ def construct_wcp_mf_dataloader(config, device, require_index=False):
                                                             train_ratio=data_params["train_ratio"],
                                                             test_ratio=data_params["test_ratio"])
     
-    n_train_obs, n_val_obs, n_test_obs = len(train_obs_mat), len(val_obs_mat), len(test_obs_mat)
-    n_train_int, n_val_int, n_test_int = len(train_int_mat), len(val_int_mat), len(test_int_mat)
-
-    config['n_train_obs'] = n_train_obs
-    config['n_val_obs'] = n_val_obs
-
-    config['n_train_int'] = n_train_int
-    config['n_val_int'] = n_val_int
-    config['n_test_int'] = n_test_int
-
-    print(f"Obs Sample Size: n_train_obs: {n_train_obs}, n_val_obs: {n_val_obs}, n_test_obs: {n_test_obs}")
-    print(f"Int Sample Size: n_train_int: {n_train_int}, n_val_int: {n_val_int}, n_test_obs: {n_test_int}")
 
     n_users = train_obs_mat[:, 0].astype(int).max() + 1
     n_items = train_obs_mat[:, 1].astype(int).max() + 1
@@ -480,14 +469,53 @@ def construct_wcp_mf_dataloader(config, device, require_index=False):
                 "n_items": n_items
             }
 
-    # train_obs_loader, val_obs_loader, train_int_loader, test_int_loader = get_dataloader_wcp(train_obs_mat,
-    #                                                        train_obs_ratings,
-    #                                                        val_obs_mat,
-    #                                                        train_int_mat,
-    #                                                        test_int_mat,
-    #                                                        config["batch_size"],
-    #                                                        require_index=require_index)
-        
+    if method == "wcp_ips":
+        # use 16% randomized data to get propensity for wcp as in existing work
+        uniform_data, index = load_uniform_data_from_np(0.166, val_int_mat, shape=(n_users, n_items))
+        val_int_mat = np.delete(val_int_mat, index, axis=0)
+
+        def Naive_Bayes_Propensity(train, unif):
+            # follow [1] Jiawei Chen et, al, AutoDebias: Learning to Debias for Recommendation 2021SIGIR and
+            # [2] Tobias Schnabel, et, al, Recommendations as Treatments: Debiasing Learning and Evaluation
+            P_Oeq1 = train.getnnz() / (train.shape[0] * train.shape[1])
+            train.data[train.data < threshold] = 0
+            train.data[train.data >= threshold] = 1
+            # unif.data[unif.data < threshold] = 0
+            # unif.data[unif.data > threshold] = 1
+
+            y_unique = np.unique(train.data)
+            P_y_givenO = np.zeros(y_unique.shape)
+            P_y = np.zeros(y_unique.shape)
+
+            for i in range(len(y_unique)):
+                P_y_givenO[i] = np.sum(train.data == y_unique[i]) / np.sum(
+                    np.ones(train.data.shape))
+                P_y[i] = np.sum(unif.data == y_unique[i]) / np.sum(np.ones(unif.data.shape))
+            Propensity = P_y_givenO * P_Oeq1 / P_y
+            Propensity = Propensity * (np.ones((n_items, 2)))
+
+            return y_unique, Propensity
+
+        y_unique, Propensity = Naive_Bayes_Propensity(np_to_csr(train_obs_mat), uniform_data)
+        InvP = torch.reciprocal(torch.tensor(Propensity, dtype=torch.float)).to(device)
+
+    else:
+        y_unique = None
+        InvP = None
+
+    n_train_obs, n_val_obs, n_test_obs = len(train_obs_mat), len(val_obs_mat), len(test_obs_mat)
+    n_train_int, n_val_int, n_test_int = len(train_int_mat), len(val_int_mat), len(test_int_mat)
+
+    config['n_train_obs'] = n_train_obs
+    config['n_val_obs'] = n_val_obs
+
+    config['n_train_int'] = n_train_int
+    config['n_val_int'] = n_val_int
+    config['n_test_int'] = n_test_int
+
+    print(f"Obs Sample Size: n_train_obs: {n_train_obs}, n_val_obs: {n_val_obs}, n_test_obs: {n_test_obs}")
+    print(f"Int Sample Size: n_train_int: {n_train_int}, n_val_int: {n_val_int}, n_test_obs: {n_test_int}")
+
     train_obs_loader, val_obs_loader, _ = get_dataloader(train_obs_mat,
                                                            train_obs_ratings,
                                                            val_obs_mat,
@@ -501,8 +529,8 @@ def construct_wcp_mf_dataloader(config, device, require_index=False):
                                                            test_int_mat,
                                                            config["batch_size"],
                                                            require_index=require_index)
-    
-    return train_obs_loader, val_obs_loader, train_int_loader, val_int_loader, test_int_loader, evaluation_params, n_users, n_items
+
+    return train_obs_loader, val_obs_loader, train_int_loader, val_int_loader, test_int_loader, evaluation_params, n_users, n_items, y_unique, InvP
 
 
 def construct_naive_mf_dataloader(config, device, require_index=False):
@@ -589,6 +617,7 @@ def construct_mf_dataloader(config, device, require_index=False):
                                                            test_mat,
                                                            config["batch_size"],
                                                            require_index=require_index)
+    
     return train_loader, val_loader, test_loader, evaluation_params, n_users, n_items
 
 

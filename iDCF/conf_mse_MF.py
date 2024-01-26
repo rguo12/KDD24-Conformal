@@ -33,9 +33,9 @@ def train_eval(config):
 
     for i in range(config["n_folds"]):
         
-        train_obs_loader, val_obs_loader, train_int_loader, val_int_loader, test_int_loader, evaluation_params, n_users, n_items = construct_wcp_mf_dataloader(
+        train_obs_loader, val_obs_loader, train_int_loader, val_int_loader, test_int_loader, evaluation_params, n_users, n_items, y_unique, InvP = construct_wcp_mf_dataloader(
             config, DEVICE)
-        if method in ["exact", "inexact"]:
+        if method in ["exact", "inexact", "wcp", "wcp_ips"]:
             train_loader = train_obs_loader
             val_loader = val_obs_loader
 
@@ -56,7 +56,7 @@ def train_eval(config):
         test_int_loaders.append(test_int_loader)
 
         # two quantile MF regression models, for upper/lower bound
-        model = MF(n_users, n_items, config["embedding_dim"]).to(DEVICE)
+        model = MF(n_users, n_items, y_unique, InvP, config["embedding_dim"]).to(DEVICE)
         # model_l = MF(n_users, n_items, config["embedding_dim"]).to(DEVICE)
 
         model_list.append(model)
@@ -89,7 +89,7 @@ def train_eval(config):
             total_len = 0
 
             for index, (uid, iid, rating) in enumerate(train_loader):
-                # model_u.train()
+                
                 model.train()
                 
                 uid, iid, rating = uid.to(DEVICE), iid.to(DEVICE), rating.float().to(DEVICE)
@@ -137,45 +137,55 @@ def train_eval(config):
         print("best val performance = {}".format(evaluator.get_val_best_performance()))
         # model_u.load_state_dict(evaluator_u.get_best_model())
 
-        if method == "naive":
+        if method in ["naive", "wcp_ips"]:
             density_ratio_model = None
 
-        elif method in ["exact", "inexact"]:
+        elif method in ["exact", "inexact", "wcp"]:
             # train density ratio model after training MF model
-            print("training density ratio model...")
-            density_ratio_model = train_density_ratio(train_obs_loader, train_int_loader, 
-                                                    model,
+            print(f"training density ratio model for {method}...")
+            density_ratio_model = train_density_ratio(train_obs_loader, 
+                                                      train_int_loader, 
+                                                    model, method,
                                                     device=DEVICE,
                                                     dr_model=config["dr_model"])
             
             print("finished training density ratio model")
-            
         dr_model_list.append(density_ratio_model)
 
-            # evaluate with final model
+    # evaluate with final model
     if method in ["exact", "inexact"]:
         # use val_obs as calibration, test_int as test
-        if method == "exact":
-            exact = True
-        else:
-            exact = False
+
         ts_coverages, ts_inter_widths = mf_conf_eval_splitcp_mse(val_obs_loaders,
                                                              val_int_loaders, 
                                                             test_int_loaders, 
                                                             model_list,
                                                             dr_model_list,
+                                                            method,
                                                             device=DEVICE, 
                                                             params=evaluation_params,
                                                             alpha=0.1, 
                                                             standardize=config["standardize"],
-                                                                exact=exact,
-                                                                dr_model=config["dr_model"])
+                                                                dr_model=config["dr_model"], 
+                                                                dataset=config["data_params"]["name"])
         
     elif method == "naive":
-        ts_coverages, ts_inter_widths = mf_conf_eval_naive_mse(val_int_loaders, test_int_loaders, model_list,
-                 device=DEVICE, params=evaluation_params, alpha=0.1, standardize=config["standardize"])
+        ts_coverages, ts_inter_widths = mf_conf_eval_naive_mse(
+                val_int_loaders, test_int_loaders, model_list, method,
+                 device=DEVICE, params=evaluation_params, 
+                 alpha=0.1, standardize=config["standardize"], dataset=config["data_params"]["name"])
 
-    for i in range(len(ts_coverages)):
+
+    elif method in ["wcp", "wcp_ips"]:
+        ts_coverages, ts_inter_widths = mf_conf_eval_wcp_mse(
+                val_obs_loaders, val_int_loaders, test_int_loaders, 
+                model_list, dr_model_list, method,
+                 device=DEVICE, params=evaluation_params, 
+                 alpha=0.1, standardize=config["standardize"], dr_model=config["dr_model"],
+                   dataset=config["data_params"]["name"])
+    
+    n_folds = len(ts_coverages)
+    for i in range(n_folds):
         results = {
             "method": config["method"],
             "test_coverage": ts_coverages[i],
@@ -276,7 +286,7 @@ if __name__ == '__main__':
         "patience": args.patience,
         "lr_rate": 5e-4,
         "weight_decay": 1e-6,
-        "epochs": 200,
+        "epochs": 1,
         "batch_size": args.data_params["batch_size"],
         "embedding_dim": 64,
         "topk": args.topk,

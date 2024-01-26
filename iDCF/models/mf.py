@@ -3,8 +3,10 @@ import torch
 import numpy as np
 import os
 
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
 class MF(nn.Module):
-    def __init__(self, num_users, num_items, embedding_size=100, dropout=0.):
+    def __init__(self, num_users, num_items, y_unique, InverP, embedding_size=100, dropout=0.):
         super(MF, self).__init__()
         self.user_emb = nn.Embedding(num_users, embedding_size)
         self.user_bias = nn.Embedding(num_users, 1)
@@ -17,7 +19,14 @@ class MF(nn.Module):
         self.item_bias.weight.data.uniform_(-0.01, 0.01)
 
         self.mean = nn.Parameter(torch.FloatTensor([0]), False)
+
+        self.corY = y_unique
+
         self.drop = nn.Dropout(dropout)
+
+        self.invP = InverP
+
+        self.device = DEVICE
 
     def forward(self, u_id, i_id):
         U = self.drop(self.user_emb(u_id))
@@ -33,6 +42,16 @@ class MF(nn.Module):
         U = self.drop(self.user_emb(u_id))
         I = self.drop(self.item_emb(i_id))
         return U, I
+    
+    def compute_ips_weights(self, u_id, i_id, y_train):
+
+        weight = torch.ones_like(y_train).to(self.device)
+        for i in range(len(self.corY)):
+            weight[y_train == self.corY[i]] = self.invP[i_id][y_train == self.corY[i], i]
+        
+        return weight
+
+
 
 
 

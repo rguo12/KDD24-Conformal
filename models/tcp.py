@@ -670,7 +670,6 @@ class SplitCP(BaseCP):
                 y1_l_f = self.models_l_1[j][i].predict(X_calib_inter_fold_two_1) - offset_1
                 y1_u_f = self.models_u_1[j][i].predict(X_calib_inter_fold_two_1) + offset_1
 
-
                 # use fold one of calib_int data to fit regression on y_u and y_l
                 self.C0_l_model_.fit(X_calib_inter_fold_two_0, y0_l_f)
                 self.C0_u_model_.fit(X_calib_inter_fold_two_0, y0_u_f)

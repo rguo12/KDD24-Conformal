@@ -63,7 +63,7 @@ def weighted_conformal(alpha, weights_calib, weights_test, scores):
     offset = scores[index_quantile]
     return offset
 
-def get_density_ratio_data(data_loader, model, device="cpu"):
+def get_density_ratio_data(data_loader, model, method, device="cpu"):
     # collect data
     labels = []
     embeddings = []
@@ -76,14 +76,39 @@ def get_density_ratio_data(data_loader, model, device="cpu"):
     
     embeddings = np.concatenate(embeddings, axis=0)
     labels = np.array(labels).reshape(-1,1)
+    if method == "wcp":
+        return embeddings
+    elif method in ["exact", "inexact"]:
+        D = np.concatenate([embeddings,labels],axis=1)
+        return D
+    else:
+        raise ValueError("incorrect method")
 
-    D = np.concatenate([embeddings,labels],axis=1)
-    return D
 
-def train_density_ratio(train_obs_loader, train_int_loader, model, device="cpu",dr_model="DR"):
 
-    D_train_obs = get_density_ratio_data(train_obs_loader, model, device=device)
-    D_train_int = get_density_ratio_data(train_int_loader, model, device=device)
+def get_ips_weights(data_loader, model, method, device="cpu"):
+    # collect ps for wcp_ips
+
+    ips_weights = []
+
+    for index, (uid, iid, rating) in enumerate(data_loader):
+        uid, iid, rating = uid.to(device), iid.to(device), rating.float().to(device)
+        batch_ips_weights = model.compute_ips_weights(uid,iid,rating)
+        ips_weights.append(batch_ips_weights.detach().cpu().numpy())
+    
+    ips_weights = np.concatenate(ips_weights, axis=0)
+    # labels = np.array(labels).reshape(-1,1)
+
+    if method == "wcp_ips":
+        return ips_weights
+    
+    else:
+        raise ValueError("incorrect method")
+
+def train_density_ratio(train_obs_loader, train_int_loader, model, method, device="cpu", dr_model="DR"):
+
+    D_train_obs = get_density_ratio_data(train_obs_loader, model, method, device=device)
+    D_train_int = get_density_ratio_data(train_int_loader, model, method, device=device)
     
     if dr_model=="DR":
         density_ratio_model = densratio(D_train_int, D_train_obs, verbose=False, alpha=0.01)
@@ -108,6 +133,7 @@ def train_density_ratio(train_obs_loader, train_int_loader, model, device="cpu",
     return density_ratio_model
 
 def train_density_model(self, D_inter, D_obs):
+
     if self.density_ratio_model == "DR": # density ratio estimator
         density_model = densratio(D_inter, D_obs, alpha=0.01)
         # self.density_models = density_model # save density ratio model
@@ -231,9 +257,9 @@ def mf_conf_eval_splitcp(cal_obs_loaders:list, cal_int_loaders:list, test_int_lo
         
         plot_vec_dist(scores_list, folder_name="iDCF/figs", filename='nonconf_score_cal_obs.png')
 
-        D_calib_obs = get_density_ratio_data(cal_obs_loader, model_u, device=device)
-        D_calib_int = get_density_ratio_data(cal_int_loader, model_u, device=device)
-        D_test_int = get_density_ratio_data(test_int_loader, model_u, device=device)
+        D_calib_obs = get_density_ratio_data(cal_obs_loader, model_u,method, device=device)
+        D_calib_int = get_density_ratio_data(cal_int_loader, model_u,method, device=device)
+        D_test_int = get_density_ratio_data(test_int_loader, model_u,method, device=device)
 
         X_calib_int = D_calib_int[:,:-1] # drop the last dimension
         X_test_int = D_test_int[:,:-1]
@@ -367,13 +393,13 @@ def mf_conf_eval_splitcp(cal_obs_loaders:list, cal_int_loaders:list, test_int_lo
     return coverages, interval_widths
 
 def mf_conf_eval_splitcp_mse(cal_obs_loaders:list, cal_int_loaders:list, test_int_loaders:list, 
-                         model_list:list, dr_model_list:list,
+                         model_list:list, dr_model_list:list, method:str,
                         device:str="cpu", params=None, alpha:float=0.1, standardize:bool=True,
-                        base_learner:str="RF", n_estimators:int=10, exact:bool=False,
-                        dr_model:str="DR"):
+                        base_learner:str="RF", n_estimators:int=10,
+                        dr_model:str="DR", dataset="coat"):
 
     """
-    do split CP (exact and inexact for a single MF model trained with mse loss)
+    split CP (exact and inexact for a single MF model trained with mse loss)
     """
     
     print("start conf eval for our split cp methods")
@@ -398,13 +424,14 @@ def mf_conf_eval_splitcp_mse(cal_obs_loaders:list, cal_int_loaders:list, test_in
         
         # normal split CP: compute scores on cal_obs
         scores_list = mf_calib_mse(cal_obs_loader, model, 
-                               device=device, alpha=alpha, params=params, standardize=standardize)
+                               device=device, alpha=alpha, 
+                               params=params, standardize=standardize)
         
-        plot_vec_dist(scores_list, folder_name="iDCF/figs", filename='nonconf_score_cal_obs.png')
+        plot_vec_dist(scores_list, folder_name=f"iDCF/figs/{dataset}", filename='nonconf_score_cal_obs.png')
 
-        D_calib_obs = get_density_ratio_data(cal_obs_loader, model, device=device)
-        D_calib_int = get_density_ratio_data(cal_int_loader, model, device=device)
-        D_test_int = get_density_ratio_data(test_int_loader, model, device=device)
+        D_calib_obs = get_density_ratio_data(cal_obs_loader, model, method, device=device)
+        D_calib_int = get_density_ratio_data(cal_int_loader, model, method, device=device)
+        D_test_int = get_density_ratio_data(test_int_loader, model, method, device=device)
 
         X_calib_int = D_calib_int[:,:-1] # drop the last dimension
         X_test_int = D_test_int[:,:-1]
@@ -412,7 +439,7 @@ def mf_conf_eval_splitcp_mse(cal_obs_loaders:list, cal_int_loaders:list, test_in
         y_calib_int =  D_calib_int[:,-1]
         y_test_int =  D_test_int[:,-1]
 
-        if exact:
+        if method == "exact":
             # n_calib_obs = len(D_calib_obs)
             n_calib_int = len(D_calib_int)
             # n_test_int = len(D_test_int)
@@ -437,7 +464,7 @@ def mf_conf_eval_splitcp_mse(cal_obs_loaders:list, cal_int_loaders:list, test_in
                 p_calib_int = density_model.predict_proba(D_calib_int_fold_one)[:,1]
                 weights_calib_int = (1. - p_calib_int) / p_calib_int
 
-        else:
+        elif method == "inexact":
             if dr_model == "DR":
                 weights_calib_obs = density_model.compute_density_ratio(D_calib_obs)
                 weights_calib_int = density_model.compute_density_ratio(D_calib_int)
@@ -448,11 +475,21 @@ def mf_conf_eval_splitcp_mse(cal_obs_loaders:list, cal_int_loaders:list, test_in
 
                 p_calib_int = density_model.predict_proba(D_calib_int)[:,1]
                 weights_calib_int = (1. - p_calib_int) / p_calib_int
+        else:
+            raise ValueError("only support [exact, inexact]")
 
         print(f"weight obs: mean {np.mean(weights_calib_obs)}, std {np.std(weights_calib_obs)}")
         print(f"weight int: mean {np.mean(weights_calib_int)}, std {np.std(weights_calib_int)}")
 
-        # weights are different for exact and inexact
+        plot_vec_dist(weights_calib_obs, 
+                      folder_name=f"iDCF/figs/{dataset}", 
+                      filename=f'{method}_weights_calib_obs.png')
+        
+        plot_vec_dist(weights_calib_int, 
+                      folder_name=f"iDCF/figs/{dataset}", 
+                      filename=f'{method}_weights_calib_int.png')
+
+        # weights are different between exact and inexact
         offset = weighted_conformal(alpha, weights_calib_obs, weights_calib_int, scores_list)[0]
         print(f"offset: {offset}")
 
@@ -481,7 +518,7 @@ def mf_conf_eval_splitcp_mse(cal_obs_loaders:list, cal_int_loaders:list, test_in
             y_u_predictor = RandomForestRegressor(n_estimators=n_estimators) #base_learners_dict[base_learner](**first_CQR_args_u)
             y_l_predictor = RandomForestRegressor(n_estimators=n_estimators) #base_learners_dict[base_learner](**first_CQR_args_l)
 
-            if exact:
+            if method == "exact":
                 y_u_fold_one = y_u_list[:n_calib_int_fold_one]
                 y_l_fold_one = y_l_list[:n_calib_int_fold_one]
                 # y_u_fold_two = y_u_list[n_calib_int_fold_one:]
@@ -594,8 +631,8 @@ def mf_conf_eval_naive(cal_loaders:list, test_loaders:list, model_u_list:list, m
                 
     return coverages, interval_widths
 
-def mf_conf_eval_naive_mse(cal_loaders:list, test_loaders:list, model_list:list, 
-                 device="cpu", params=None, alpha=0.1, standardize=True):
+def mf_conf_eval_naive_mse(cal_loaders:list, test_loaders:list, model_list:list, method:str,
+                 device="cpu", params=None, alpha=0.1, standardize=True, dataset="coat"):
 
     n_folds = len(cal_loaders)
 
@@ -614,7 +651,7 @@ def mf_conf_eval_naive_mse(cal_loaders:list, test_loaders:list, model_list:list,
         model.eval()
         
         scores_list = mf_calib_mse(cal_loader, model, device=device, alpha=alpha, standardize=standardize, params=params)
-        plot_vec_dist(scores_list, folder_name="iDCF/figs", filename='nonconf_score_cal_int.png')
+        plot_vec_dist(scores_list, folder_name=f"iDCF/figs/{dataset}", filename='nonconf_score_cal_int.png')
 
         offset = standard_conformal(alpha, scores_list)
 
@@ -649,10 +686,19 @@ def mf_conf_eval_naive_mse(cal_loaders:list, test_loaders:list, model_list:list,
     return coverages, interval_widths
 
 
-def mf_conf_eval_wcp_mse(cal_loaders:list, test_loaders:list, model_list:list, 
-                 device="cpu", params=None, alpha=0.1, standardize=True):
+def mf_conf_eval_wcp_mse(cal_obs_loaders:list, cal_int_loaders:list, test_int_loaders:list,
+                          model_list:list, dr_model_list:list, 
+                          method:str,
+                        device="cpu", params=None, alpha=0.1, standardize=True, dataset="coat", dr_model:str="DR"):
 
-    n_folds = len(cal_loaders)
+    # cal_loaders: calib obs
+    # test_loaders: test int
+
+    # def weight_1(model, x):
+    #     pscores = model.predict_proba(x)[:, 1]
+    #     return 1. / pscores
+
+    n_folds = len(cal_obs_loaders)
 
     # offset_list = []
     # predict_u_list = []
@@ -663,19 +709,65 @@ def mf_conf_eval_wcp_mse(cal_loaders:list, test_loaders:list, model_list:list,
 
     for i in range(n_folds):
         model = model_list[i]
-        cal_loader = cal_loaders[i]
-        test_loader = test_loaders[i]
+        cal_obs_loader = cal_obs_loaders[i]
+        cal_int_loader = cal_int_loaders[i]
+        test_int_loader = test_int_loaders[i]
+
+        density_model = dr_model_list[i]
 
         model.eval()
         
-        scores_list = mf_calib_mse(cal_loader, model, device=device, alpha=alpha, standardize=standardize, params=params)
-        plot_vec_dist(scores_list, folder_name="iDCF/figs", filename='nonconf_score_cal_int.png')
+        scores_list = mf_calib_mse(cal_obs_loader, model, 
+                                   device=device,
+                                   alpha=alpha, 
+                                   standardize=standardize, 
+                                   params=params)
+        
+        plot_vec_dist(scores_list, 
+                      folder_name=f"iDCF/figs/{dataset}", 
+                      filename=f'{method}_nonconf_score_cal_obs.png')
+        
+        if method == "wcp":
+            # D is just embeddings for wcp
+            X_calib_obs = get_density_ratio_data(cal_obs_loader, model, method, device=device)
+            X_calib_int = get_density_ratio_data(cal_int_loader, model, method, device=device)
 
-        offset = standard_conformal(alpha, scores_list)
+            if dr_model == "DR":
+                weights_calib_obs = density_model.compute_density_ratio(X_calib_obs)
+                weights_calib_int = density_model.compute_density_ratio(X_calib_int)
+
+            elif dr_model == "MLP":
+                p_calib_obs = density_model.predict_proba(X_calib_obs)[:,1]
+                weights_calib_obs = (1. - p_calib_obs) / p_calib_obs #TODO: double check
+
+                p_calib_int = density_model.predict_proba(X_calib_int)[:,1]
+                weights_calib_int = (1. - p_calib_int) / p_calib_int
+        
+        
+        elif method == "wcp_ips":
+            weights_calib_obs = get_ips_weights(cal_obs_loader, model, method, device="cpu")
+            weights_calib_int = get_ips_weights(cal_int_loader, model, method, device="cpu")
+
+        else:
+            raise ValueError("method not supported")
+
+        # should the offset be different for each test sample?
+
+        plot_vec_dist(weights_calib_obs, 
+                      folder_name=f"iDCF/figs/{dataset}", 
+                      filename=f'{method}_weights_calib_obs.png')
+        
+        plot_vec_dist(weights_calib_int, 
+                      folder_name=f"iDCF/figs/{dataset}", 
+                      filename=f'{method}_weights_calib_int.png')
+
+        offset = weighted_conformal(alpha, 
+                                    weights_calib_obs, 
+                                    weights_calib_int, scores_list)[0]
 
         with torch.no_grad():
             labels, predicts = list(), list()
-            for index, (uid, iid, rating) in enumerate(test_loader):
+            for index, (uid, iid, rating) in enumerate(test_int_loader):
                 uid, iid, rating = uid.to(device), iid.to(device), rating.to(device)
                 predict = model.predict(uid, iid)
                 
@@ -695,7 +787,8 @@ def mf_conf_eval_wcp_mse(cal_loaders:list, test_loaders:list, model_list:list,
             # predict_l_list.append(predicts_l)
 
             labels = np.array(labels)
-            coverage = np.mean((labels >= predicts_l) & (labels <= predicts_u))
+            coverage = np.mean(
+                (labels >= predicts_l) & (labels <= predicts_u))
             interval_width = np.mean(np.abs(predicts_u - predicts_l))
 
             coverages.append(coverage)

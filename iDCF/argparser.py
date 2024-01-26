@@ -84,7 +84,7 @@ def parse_args():
     parser.add_argument("--dir_prefix", type=str, default=dir_prefix)
     parser.add_argument("--tune", action="store_true")
     parser.add_argument("--metric", type=str, default="mse", help="[mpe, mse, ndcg]")
-    parser.add_argument("--dataset", type=str, default="yahoo")
+    parser.add_argument("--dataset", type=str, default="coat")
     parser.add_argument("--patience", type=int, default=20)
     parser.add_argument("--topk", type=int, default=5)
     parser.add_argument("--seed", type=int, default=1234)
@@ -96,7 +96,8 @@ def parse_args():
     parser.add_argument("--exact", type=bool, default=False)
     parser.add_argument("--dr_model", type=str, default="DR")
     parser.add_argument("--standardize", type=bool, default=True)
-    parser.add_argument("--method", type=str, default="naive")
+    parser.add_argument("--method", type=str, default="inexact", 
+                        help="[naive, inexact, exact, wcp_ips (using external PS), wcp, tcp? ]")
 
     parser.add_argument("--test_ratio", type=float, default=0.5, help="int data")
     parser.add_argument("--train_ratio", type=float, default=0.25, help="int data")
