@@ -146,7 +146,8 @@ def train_eval(config):
             density_ratio_model = train_density_ratio(train_obs_loader, train_int_loader, 
                                                     model_u,
                                                     device=DEVICE, which_model="u",
-                                                    dr_model=config["dr_model"])
+                                                    dr_model=config["dr_model"],
+                                                    mix_method=config["mix_method"])
             print("finished training density ratio model")
         dr_model_list.append(density_ratio_model)
 

@@ -14,12 +14,15 @@ commands
 *.pdf
 *.info
 *.pyc
+*.npy
+iDCF/figs
 
 wandb/
 data/IHDP
 .vscode/
 arnold/
 post_proc/
+propensity_mf/
 
 data/__pycache__/*
 models/__pycache__/*

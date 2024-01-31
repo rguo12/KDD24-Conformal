@@ -11,18 +11,14 @@ from scipy.sparse import csr_matrix
 from sklearn.metrics import mean_squared_error, mean_pinball_loss
 import torch
 from torch.utils.data import Dataset, DataLoader
-
 from sklearn.model_selection import train_test_split
 
 import torch.nn as nn
-
 from densratio import densratio
 from sklearn.neural_network import MLPClassifier
 
-
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from quantile_forest import RandomForestQuantileRegressor
-
 from sklearn.metrics import accuracy_score
 
 import matplotlib.pyplot as plt
@@ -31,10 +27,6 @@ import os
 
 base_learners_dict = dict({"GBM": GradientBoostingRegressor, 
                            "RF": RandomForestQuantileRegressor})
-
-
-
-
 
 class PinballLoss(nn.Module):
     def __init__(self, quantile):
@@ -110,7 +102,7 @@ def split_by_user(df, ratio, seed=1234):
 
 
 
-def split_random(df, tr_ratio, ts_ratio, seed=42):
+def split_random(df, tr_ratio, val_ratio, ts_ratio, seed=42):
     """
     Split the dataframe into training, validation, and test sets.
 
@@ -120,18 +112,24 @@ def split_random(df, tr_ratio, ts_ratio, seed=42):
     :return: Tuple of DataFrames (df_train, df_val, df_test).
     """
     # Ensure the ratios sum up to 1 or less
-    if tr_ratio + ts_ratio >= 1:
-        raise ValueError("Sum of training and validation ratios should be less than 1.")
+    if tr_ratio + ts_ratio + val_ratio > 1:
+        raise ValueError("Sum of ratios should be <= 1.")
 
     # Splitting into training and temp (val + test) sets
     df_train, df_temp = train_test_split(df, train_size=tr_ratio, random_state=seed)
 
     # Adjusting validation ratio for splitting temp into val and test
-    adjusted_ts_ratio = ts_ratio / (1 - tr_ratio)
-    adjusted_val_ratio = 1-adjusted_ts_ratio
+    # adjusted_ts_ratio = ts_ratio / (1 - tr_ratio)
+    adjusted_val_ratio = val_ratio / (1 - tr_ratio)
 
     # Splitting temp into validation and test sets
-    df_val, df_test = train_test_split(df_temp, train_size=adjusted_val_ratio, random_state=seed)
+    df_val, df_temp = train_test_split(df_temp, train_size=adjusted_val_ratio, random_state=seed)
+
+    adjusted_ts_ratio = ts_ratio / (1 - tr_ratio - val_ratio)
+    if adjusted_ts_ratio == 1.0:
+        df_test = df_temp
+    else:
+        df_test, df_temp = train_test_split(df_temp, train_size=adjusted_ts_ratio, random_state=seed)
 
     return df_train, df_val, df_test
 
@@ -186,7 +184,7 @@ def construct_rating_dataset(train_df_path, random_df_path, test_ratio, split_in
         return train_df.to_numpy(), val_df.to_numpy(), test_df.to_numpy()
 
 
-def construct_rating_dataset_for_naive(random_df_path, train_ratio, test_ratio, split_index=False):
+def construct_rating_dataset_for_naive(random_df_path, train_ratio, val_ratio, test_ratio, split_index=False):
     """
     Naive method only uses random (interventional) data
     """
@@ -195,7 +193,7 @@ def construct_rating_dataset_for_naive(random_df_path, train_ratio, test_ratio, 
     random_df = pd.read_csv(random_df_path)
 
     # val_df, test_df = split_by_item(random_df, validation_ratio)
-    train_df, val_df, test_df = split_random(random_df, train_ratio, test_ratio, seed=42)
+    train_df, val_df, test_df = split_random(random_df, train_ratio, val_ratio, test_ratio, seed=42)
 
     return train_df.to_numpy(), val_df.to_numpy(), test_df.to_numpy()
 
@@ -342,7 +340,9 @@ def mf_evaluate(metric, data_loader, test_model, device="cpu", params=None, alph
             for index, (uid, iid, rating) in enumerate(data_loader):
                 uid, iid, rating = uid.to(device), iid.to(device), rating.to(device)
                 predict = test_model.predict(uid, iid)
-                predict = params["min_val"] + predict * (params["max_val"] - params["min_val"])
+
+                if standardize:
+                    predict = params["min_val"] + predict * (params["max_val"] - params["min_val"])
 
                 labels.extend(rating.tolist())
                 predicts.extend(predict.tolist())
@@ -409,7 +409,7 @@ class MFRatingDataset(Dataset):
     def __len__(self):
         return len(self.rating)
 
-def construct_wcp_mf_dataloader(config, device, require_index=False):
+def construct_wcp_mf_dataloader(config, device, require_index=False, ips_ratio=1.0):
     # ratios are determined by train_ratio and test_ratio
 
     data_params = config["data_params"]
@@ -425,12 +425,14 @@ def construct_wcp_mf_dataloader(config, device, require_index=False):
                                                             data_params["train_path"],
                                                             # data_params["random_path"],
                                                             train_ratio=data_params["obs_train_ratio"],
+                                                            val_ratio=data_params["obs_val_ratio"],
                                                             test_ratio=data_params["obs_test_ratio"])
     
     train_int_mat, val_int_mat, test_int_mat = construct_rating_dataset_for_naive(
                                                             # data_params["train_path"],
                                                             data_params["random_path"],
                                                             train_ratio=data_params["train_ratio"],
+                                                            val_ratio=data_params["val_ratio"],
                                                             test_ratio=data_params["test_ratio"])
     
 
@@ -471,8 +473,8 @@ def construct_wcp_mf_dataloader(config, device, require_index=False):
 
     if method == "wcp_ips":
         # use 16% randomized data to get propensity for wcp as in existing work
-        uniform_data, index = load_uniform_data_from_np(0.166, val_int_mat, shape=(n_users, n_items))
-        val_int_mat = np.delete(val_int_mat, index, axis=0)
+        uniform_data, index = load_uniform_data_from_np(ips_ratio, val_int_mat, shape=(n_users, n_items))
+        # val_int_mat = np.delete(val_int_mat, index, axis=0)
 
         def Naive_Bayes_Propensity(train, unif):
             # follow [1] Jiawei Chen et, al, AutoDebias: Learning to Debias for Recommendation 2021SIGIR and
@@ -533,55 +535,55 @@ def construct_wcp_mf_dataloader(config, device, require_index=False):
     return train_obs_loader, val_obs_loader, train_int_loader, val_int_loader, test_int_loader, evaluation_params, n_users, n_items, y_unique, InvP
 
 
-def construct_naive_mf_dataloader(config, device, require_index=False):
-    # ratios are determined by train_ratio and test_ratio
+# def construct_naive_mf_dataloader(config, device, require_index=False):
+#     # ratios are determined by train_ratio and test_ratio
 
-    standardize = config["standardize"]
-    data_params = config["data_params"]
+#     standardize = config["standardize"]
+#     data_params = config["data_params"]
 
-    # naive method only use randomized data for tr/cal/ts
-    # train_mat, val_mat, test_mat = construct_rating_dataset(data_params["train_path"],
-    #                                                         data_params["random_path"],
-    #                                                         test_ratio=data_params["test_ratio"])
+#     # naive method only use randomized data for tr/cal/ts
+#     # train_mat, val_mat, test_mat = construct_rating_dataset(data_params["train_path"],
+#     #                                                         data_params["random_path"],
+#     #                                                         test_ratio=data_params["test_ratio"])
 
-    train_mat, val_mat, test_mat = construct_rating_dataset_for_naive(
-                                                            data_params["random_path"],
-                                                            train_ratio=data_params["train_ratio"],
-                                                            test_ratio=data_params["test_ratio"])
+#     train_mat, val_mat, test_mat = construct_rating_dataset_for_naive(
+#                                                             data_params["random_path"],
+#                                                             train_ratio=data_params["train_ratio"],
+#                                                             test_ratio=data_params["test_ratio"])
 
-    n_users = train_mat[:, 0].astype(int).max() + 1
-    n_items = train_mat[:, 1].astype(int).max() + 1
+#     n_users = train_mat[:, 0].astype(int).max() + 1
+#     n_items = train_mat[:, 1].astype(int).max() + 1
 
-    min_val, max_val = data_params["min_val"], data_params["max_val"]
-    threshold = data_params["threshold"]
+#     min_val, max_val = data_params["min_val"], data_params["max_val"]
+#     threshold = data_params["threshold"]
 
-    if standardize:
-        if config["metric"] in ["mse", "mpe"]:
-            train_ratings = ((train_mat[:, 2] - min_val) / (max_val - min_val)).astype(np.float32)
-            evaluation_params = {
-                "min_val": min_val,
-                "max_val": max_val,
-                "n_items": n_items
-            }
-        else:
-            train_ratings = (train_mat[:, 2] >= threshold).astype(np.float32)
-            val_mat[:, 2] = val_mat[:, 2] >= threshold
-            test_mat[:, 2] = test_mat[:, 2] >= threshold
+#     if standardize:
+#         if config["metric"] in ["mse", "mpe"]:
+#             train_ratings = ((train_mat[:, 2] - min_val) / (max_val - min_val)).astype(np.float32)
+#             evaluation_params = {
+#                 "min_val": min_val,
+#                 "max_val": max_val,
+#                 "n_items": n_items
+#             }
+#         else:
+#             train_ratings = (train_mat[:, 2] >= threshold).astype(np.float32)
+#             val_mat[:, 2] = val_mat[:, 2] >= threshold
+#             test_mat[:, 2] = test_mat[:, 2] >= threshold
 
-            evaluation_params = {
-                "k": config["topk"]
-            }
-    else:
-        train_ratings = train_mat[:, 2]
+#             evaluation_params = {
+#                 "k": config["topk"]
+#             }
+#     else:
+#         train_ratings = train_mat[:, 2]
 
-    train_loader, val_loader, test_loader = get_dataloader(train_mat,
-                                                           train_ratings,
-                                                           val_mat,
-                                                           test_mat,
-                                                           config["batch_size"],
-                                                           require_index=require_index)
+#     train_loader, val_loader, test_loader = get_dataloader(train_mat,
+#                                                            train_ratings,
+#                                                            val_mat,
+#                                                            test_mat,
+#                                                            config["batch_size"],
+#                                                            require_index=require_index)
     
-    return train_loader, val_loader, test_loader, evaluation_params, n_users, n_items
+#     return train_loader, val_loader, test_loader, evaluation_params, n_users, n_items
 
 def construct_mf_dataloader(config, device, require_index=False):
     data_params = config["data_params"]
@@ -627,6 +629,9 @@ def get_dataloader(train_mat, train_ratings, val_mat, test_mat, batch_size, requ
                                     train_mat[:, 1].astype(int),
                                     train_ratings,
                                     require_index)
+    
+    # here, the rating of val and test are not standardized, may be an issue
+
     val_dataset = MFRatingDataset(val_mat[:, 0].astype(int),
                                   val_mat[:, 1].astype(int),
                                   val_mat[:, 2])
@@ -736,23 +741,26 @@ def read_best_params(model, key_name, sr=0.1, cr=2.0, tr=0.0):
 
 
 
-def plot_vec_dist(x, folder_name="figs", filename='nonconf_score.png'):
+def plot_vec_dist(x, folder_name="figs", filename='nonconf_score.png', offset=None):
     """
     Plots and saves a comparison of the distributions of two vectors.
 
     :param vector1: First vector of numeric values.
-    :param vector2: Second vector of numeric values.
     :param filename: Filename for the saved plot. Defaults to 'distribution_comparison.png'.
     """
     plt.figure(figsize=(10, 6))
-    plt.hist(x, bins=30, alpha=0.5, label='Vector 1')
+    # plt.hist(x, bins=50, alpha=0.5, label='')
+    plt.boxplot(x, vert=False)  # vert=False makes the boxplot horizontal
+
     # plt.hist(vector2, bins=30, alpha=0.5, label='Vector 2')
     plt.xlabel('Value')
-    plt.ylabel('Frequency')
-    plt.title('Nonconf Score Dist')
-    plt.legend()
+    # plt.ylabel('Freq')
+    # if offset is not None:
+    #     plt.title(f'Mean Offset: {np.mean(offset)}')
+    # plt.legend()
     plt.grid(True)
     plt.savefig(os.path.join(folder_name,filename))
+    np.save(os.path.join(folder_name,filename[:-4]), x)
     plt.close()
 
 
@@ -765,6 +773,12 @@ def save_rec_results(config, res, run_name):
     # res['int_test_ratio'] = config["data_params"]['test_ratio']
     res['embedding_dim'] = config['embedding_dim']
     res['seed'] = config['seed']
+    res['alpha'] = config['alpha']
+
+    if config['dr_use_Y']:
+        res['dr_use_Y'] = 1
+    else:
+        res['dr_use_Y'] = 0
 
     # res['conf_strength'] = args.conf_strength
 

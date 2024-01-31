@@ -21,7 +21,6 @@ env = get_rh2_env()
 # output_model_id = env.outputs.output_model.id
 # output_model_path = env.outputs.output_model.meta.hdfs_dir
 
-
 dataset = env.params.dataset
 output_folder = env.params.output_folder
 

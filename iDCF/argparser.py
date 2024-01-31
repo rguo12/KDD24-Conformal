@@ -87,26 +87,33 @@ def parse_args():
     parser.add_argument("--dataset", type=str, default="coat")
     parser.add_argument("--patience", type=int, default=20)
     parser.add_argument("--topk", type=int, default=5)
-    parser.add_argument("--seed", type=int, default=1234)
+    parser.add_argument("--seed", type=int, default=999)
     parser.add_argument("--test_seed", action="store_true")
     parser.add_argument("--sim_suffix", type=str, default="")
     parser.add_argument("--key_name", type=str)
     
     parser.add_argument("--n_folds", type=int, default=1)
-    parser.add_argument("--exact", type=bool, default=False)
     parser.add_argument("--dr_model", type=str, default="DR")
-    parser.add_argument("--standardize", type=bool, default=True)
-    parser.add_argument("--method", type=str, default="inexact", 
-                        help="[naive, inexact, exact, wcp_ips (using external PS), wcp, tcp? ]")
+    parser.add_argument("--standardize", type=bool, default=False)
+    parser.add_argument("--method", type=str, default="exact", 
+                        help="[naive, inexact, exact, wcp_ips (using external PS), tcp? ]")
 
-    parser.add_argument("--test_ratio", type=float, default=0.5, help="int data")
-    parser.add_argument("--train_ratio", type=float, default=0.25, help="int data")
+    parser.add_argument("--test_ratio", type=float, default=0.6, help="int data")
+    parser.add_argument("--val_ratio", type=float, default=0.1, help="int data")
+    parser.add_argument("--train_ratio", type=float, default=0.1, help="int data")
 
-    parser.add_argument("--obs_test_ratio", type=float, default=0.005)
+    parser.add_argument("--obs_val_ratio", type=float, default=0.199)
     parser.add_argument("--obs_train_ratio", type=float, default=0.8)
+    
+    parser.add_argument("--alpha", type=float, default=0.1)
+    parser.add_argument("--embedding_dim", type=int, default=1)
+    parser.add_argument("--mix_method", type=str, default="sum", help="[concat, sum, product]")
+    parser.add_argument("--dr_use_Y", action='store_true')
 
     parser.add_argument("--save_path", type=str, default="results/")
-    
+
+    parser.add_argument("--epochs", type=int, default=1)
+
     args = parser.parse_args()
     
     if args.dataset == "yahoo":

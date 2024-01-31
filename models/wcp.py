@@ -13,10 +13,14 @@ from densratio import densratio
 import numpy as np
 import models.utils as utils
 
+from iDCF.utils import plot_vec_dist
+
 import warnings
 warnings.filterwarnings("ignore")
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
+
+from tqdm import tqdm
 
 # Global options for baselearners (see class attributes below)
 
@@ -64,11 +68,12 @@ class WCP:
         self.models_u_1 = [base_learners_dict[self.base_learner](**first_CQR_args_u) for _ in range(self.n_folds)]
         self.models_l_1 = [base_learners_dict[self.base_learner](**first_CQR_args_l) for _ in range(self.n_folds)] 
 
-        self.pscores_models = [GradientBoostingClassifier() for _ in range(self.n_folds)]
+        self.pscores_models = [LogisticRegression() for _ in range(self.n_folds)]
 
         if self.base_learner == "GBM":
             second_CQR_args_u = dict({"loss": "quantile", "alpha":0.6, "n_estimators": n_estimators_target})
             second_CQR_args_l = dict({"loss": "quantile", "alpha":0.4, "n_estimators": n_estimators_target})
+
         elif self.base_learner == "RF":
             second_CQR_args_u = dict({"default_quantiles":0.6, "n_estimators": n_estimators_target}) 
             second_CQR_args_l = dict({"default_quantiles":0.4, "n_estimators": n_estimators_target})
@@ -148,6 +153,16 @@ class WCP:
 
             weights_calib_1, weights_test_1, scores_1 = utils.weights_and_scores(weight_1, X_test, X_calib_1, Y_calib_1, 
                                                 Y1_calib_hat_l, Y1_calib_hat_u, self.pscores_models[i])
+            
+            plot_vec_dist(scores_1, folder_name=f"dist_figs/cevae", 
+                      filename=f'wcp_nonconf_score_cal_obs_1.png')
+            
+            plot_vec_dist(weights_calib_1, folder_name=f"dist_figs/cevae", 
+                      filename=f'wcp_weights_cal_obs_1.png')
+
+            plot_vec_dist(weights_test_1, folder_name=f"dist_figs/cevae", 
+                      filename=f'wcp_weights_test_1.png')
+
             offset_1 = utils.weighted_conformal(alpha, weights_calib_1, weights_test_1, scores_1)
             
             Y0_calib_hat_u = self.models_u_0[i].predict(X_calib_0)
@@ -155,6 +170,16 @@ class WCP:
 
             weights_calib_0, weights_test_0, scores_0 = utils.weights_and_scores(weight_0, X_test, X_calib_0, Y_calib_0, 
                                                 Y0_calib_hat_l, Y0_calib_hat_u, self.pscores_models[i])
+
+            plot_vec_dist(scores_0, folder_name=f"dist_figs/cevae", 
+                      filename=f'wcp_nonconf_score_cal_obs_0.png')
+            
+            plot_vec_dist(weights_calib_0, folder_name=f"dist_figs/cevae", 
+                      filename=f'wcp_weights_cal_obs_0.png')
+            
+            plot_vec_dist(weights_test_0, folder_name=f"dist_figs/cevae", 
+                      filename=f'wcp_weights_test_0.png')
+
             offset_0 = utils.weighted_conformal(alpha, weights_calib_0, weights_test_0, scores_0)
 
             offset_0_list.append(offset_0)

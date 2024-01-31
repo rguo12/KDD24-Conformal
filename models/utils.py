@@ -136,7 +136,7 @@ def save_dataset_stats(args, cur_time,
 
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     
-    run_name = f"dataset_stats.csv"
+    run_name = f"dataset_stats"
 
     folder_name = os.path.join(args.save_path,args.dataset,cur_time) #local path
     if not os.path.isdir(folder_name):
@@ -152,16 +152,42 @@ def save_dataset_stats(args, cur_time,
     else:
         df.to_csv(fn, mode='a', header=False)
 
-def save_results(args, res, n_intervention, n_observation, cur_time, random_number):
+
+def get_dr_data(X_obs_0, Y_obs_0, X_inter_0, Y_inter_0, dr_use_Y, pseudo_label_model, train=True):
+    if dr_use_Y == 1:
+        D_obs_0 = np.concatenate((X_obs_0, Y_obs_0[:, None]), axis=1)
+        D_inter_0 = np.concatenate((X_inter_0, Y_inter_0[:, None]), axis=1)
+    elif dr_use_Y == 0:
+        D_obs_0 = X_obs_0
+        D_inter_0 = X_inter_0
+    elif dr_use_Y == 2:
+        if train:
+            # use true label to train DR model, but use pseudo label at test time
+            D_obs_0 = np.concatenate((X_obs_0, Y_obs_0[:, None]), axis=1)
+            D_inter_0 = np.concatenate((X_inter_0, Y_inter_0[:, None]), axis=1)
+        else:
+            Y_hat_obs_0 = pseudo_label_model.predict(X_obs_0)
+            Y_hat_inter_0 = pseudo_label_model.predict(X_inter_0)
+            D_obs_0 = np.concatenate((X_obs_0, Y_hat_obs_0[:, None]), axis=1)
+            D_inter_0 = np.concatenate((X_inter_0, Y_hat_inter_0[:, None]), axis=1)
+
+    return D_obs_0, D_inter_0
+                        
+
+def save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number):
     res['n_intervention'] = n_intervention
     res['n_observation'] = n_observation
     res['conf_strength'] = args.conf_strength
+    res['dr_use_Y'] = args.dr_use_Y
+    res['seed'] = args.seed
+
+    res['x_dim'] = args.x_dim
 
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     
-    run_name = f"{random_number}_{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_seed_{args.seed}"
+    run_name = f"{cur_time}_{random_number}_{args.base_learner}_n_est_{args.n_estimators}_{args.density_ratio_model}_seed_{args.seed}"
 
-    folder_name = os.path.join(args.save_path,args.dataset,cur_time) #local path
+    folder_name = os.path.join(args.save_path,args.dataset,cur_date) #local path
     if not os.path.isdir(folder_name):
         os.mkdir(folder_name)
 

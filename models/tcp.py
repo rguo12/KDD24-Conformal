@@ -74,6 +74,13 @@ class BaseCP:
             else:
                 raise ValueError('base_learner must be one of GBM or RF')
 
+        
+        # pseudo label model
+        if self.base_learner == "GBM":
+            self.pseudo_label_args = dict({"loss": "squared_error", "n_estimators": n_estimators}) 
+        elif self.base_learner == "RF":
+            self.pseudo_label_args = dict({"criterion": "squared_error", "n_estimators": n_estimators}) 
+
         self.data_obs = data_obs
         self.data_inter = data_inter
         self.train_obs_index_list, self.X_train_obs_list, self.T_train_obs_list, self.Y_train_obs_list, self.calib_obs_index_list, self.X_calib_obs_list, self.T_calib_obs_list, self.Y_calib_obs_list = utils.split_data(self.data_obs, n_folds)
@@ -99,6 +106,7 @@ class BaseCP:
 
 
     def reset_tilde_C_ITE_models(self, cf_method):
+        # for ITE estimation
         n_estimators_target = 100
         if self.base_learner == "GBM":
             second_CQR_args_u = dict({"loss": "quantile", "alpha":0.6, "n_estimators": n_estimators_target})
@@ -149,7 +157,7 @@ class SplitCP(BaseCP):
 
 
 
-    def fit(self, method):
+    def fit(self, method, dr_use_Y=1):
         """
         Fits the plug-in models and meta-learners using the sample (X, W, Y) and true propensity scores pscores
         """
@@ -161,6 +169,9 @@ class SplitCP(BaseCP):
 
             self.density_models_0 = [[None for _ in range(self.n_folds)] for _ in range(self.n_folds)]
             self.density_models_1 = [[None for _ in range(self.n_folds)] for _ in range(self.n_folds)]
+
+            self.models_pseudo_label_0 = [[base_learners_dict[self.base_learner](**self.pseudo_label_args) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
+            self.models_pseudo_label_1 = [[base_learners_dict[self.base_learner](**self.pseudo_label_args) for _ in range(self.n_folds)] for _ in range(self.n_folds)]
 
             self.C0_l_model = RandomForestRegressor()
             self.C0_u_model = RandomForestRegressor()
@@ -187,10 +198,14 @@ class SplitCP(BaseCP):
                     self.models_u_1[j][i].fit(X_train_obs_1, Y_train_obs_1)
                     self.models_l_1[j][i].fit(X_train_obs_1, Y_train_obs_1)
                     
-                    D_train_obs_0 = np.concatenate((X_train_obs_0, Y_train_obs_0[:, None]), axis=1)
-                    D_train_inter_0 = np.concatenate((X_train_inter_0, Y_train_inter_0[:, None]), axis=1)
-                    D_train_obs_1 = np.concatenate((X_train_obs_1, Y_train_obs_1[:, None]), axis=1)
-                    D_train_inter_1 = np.concatenate((X_train_inter_1, Y_train_inter_1[:, None]), axis=1)
+                    self.models_pseudo_label_0[j][i].fit(X_train_obs_0, Y_train_obs_0)
+                    self.models_pseudo_label_1[j][i].fit(X_train_obs_1, Y_train_obs_1)
+                    
+                    D_train_obs_0, D_train_inter_0 = utils.get_dr_data(
+                        X_train_obs_0, Y_train_obs_0, X_train_inter_0, Y_train_inter_0, dr_use_Y, self.models_pseudo_label_0[j][i], train=True)
+                    
+                    D_train_obs_1, D_train_inter_1 = utils.get_dr_data(
+                        X_train_obs_1, Y_train_obs_1, X_train_inter_1, Y_train_inter_1, dr_use_Y, self.models_pseudo_label_1[j][i], train=True)
                     
                     self.density_models_0[j][i] = densratio(D_train_inter_0, D_train_obs_0, verbose=False, alpha=0.01)
                     self.density_models_1[j][i] = densratio(D_train_inter_1, D_train_obs_1, verbose=False, alpha=0.01)
@@ -250,7 +265,7 @@ class SplitCP(BaseCP):
         
         self.fitted=True
 
-    def predict_counterfactual_inexact(self, alpha, X_test, Y0, Y1, dr_model = "DR"):
+    def predict_counterfactual_inexact(self, alpha, X_test, Y0, Y1, dr_model = "DR", dr_use_Y:int = 1):
         print("Fitting models ... ")
         self.fit(method='two_stage_inexact')
         print("Fitting models done. ")
@@ -275,10 +290,22 @@ class SplitCP(BaseCP):
                 X_calib_obs_1 = self.X_calib_obs_list[i][self.T_calib_obs_list[i]==1, :]
                 Y_calib_obs_1 = self.Y_calib_obs_list[i][self.T_calib_obs_list[i]==1]
 
-                D_calib_obs_0 = np.concatenate((X_calib_obs_0, Y_calib_obs_0[:, None]), axis=1)
-                D_calib_inter_0 = np.concatenate((X_calib_inter_0, Y_calib_inter_0[:, None]), axis=1)
-                D_calib_obs_1 = np.concatenate((X_calib_obs_1, Y_calib_obs_1[:, None]), axis=1)
-                D_calib_inter_1 = np.concatenate((X_calib_inter_1, Y_calib_inter_1[:, None]), axis=1)
+                # if dr_use_Y == 1:
+                #     D_calib_obs_0 = np.concatenate((X_calib_obs_0, Y_calib_obs_0[:, None]), axis=1)
+                #     D_calib_inter_0 = np.concatenate((X_calib_inter_0, Y_calib_inter_0[:, None]), axis=1)
+                #     D_calib_obs_1 = np.concatenate((X_calib_obs_1, Y_calib_obs_1[:, None]), axis=1)
+                #     D_calib_inter_1 = np.concatenate((X_calib_inter_1, Y_calib_inter_1[:, None]), axis=1)
+                # elif dr_use_Y == 0:
+                #     D_calib_obs_0 = X_calib_obs_0
+                #     D_calib_inter_0 = X_calib_inter_0
+                #     D_calib_obs_1 = X_calib_obs_1
+                #     D_calib_inter_1 = X_calib_inter_1
+
+                D_calib_obs_0, D_calib_inter_0 = utils.get_dr_data(
+                    X_calib_obs_0, Y_calib_obs_0, X_calib_inter_0, Y_calib_inter_0, dr_use_Y, self.models_pseudo_label_0[j][i], train=False)
+            
+                D_calib_obs_1, D_calib_inter_1 = utils.get_dr_data(
+                    X_calib_obs_1, Y_calib_obs_1, X_calib_inter_1, Y_calib_inter_1, dr_use_Y, self.models_pseudo_label_1[j][i], train=False)
 
                 weights_calib_obs_0 = self.density_models_0[j][i].compute_density_ratio(D_calib_obs_0)
                 weights_calib_inter_0 = self.density_models_0[j][i].compute_density_ratio(D_calib_inter_0)
@@ -335,7 +362,7 @@ class SplitCP(BaseCP):
 
         return C0_test_l, C0_test_u, C1_test_l, C1_test_u
     
-    def predict_counterfactual_exact(self, alpha, X_test, Y0, Y1):
+    def predict_counterfactual_exact(self, alpha, X_test, Y0, Y1, dr_use_Y:bool=True):
         print("Fitting models ... ")
         self.fit(method='two_stage_exact')
         print("Fitting models done. ")
@@ -354,10 +381,12 @@ class SplitCP(BaseCP):
 
             # split calib inter data into two folds
             calib_num_0, calib_num_1 = len(X_calib_inter_0), len(X_calib_inter_1)
-            X_calib_inter_0_fold_one, X_calib_inter_0_fold_two = X_calib_inter_0[:int(calib_num_0/2), :], X_calib_inter_0[int(calib_num_0/2):, :]
-            Y_calib_inter_0_fold_one, Y_calib_inter_0_fold_two = Y_calib_inter_0[:int(calib_num_0/2)], Y_calib_inter_0[int(calib_num_0/2):]
-            X_calib_inter_1_fold_one, X_calib_inter_1_fold_two = X_calib_inter_1[:int(calib_num_1/2), :], X_calib_inter_1[int(calib_num_1/2):, :]
-            Y_calib_inter_1_fold_one, Y_calib_inter_1_fold_two = Y_calib_inter_1[:int(calib_num_1/2)], Y_calib_inter_1[int(calib_num_1/2):]
+            n_fold_one_0 = int(calib_num_0/2)
+            n_fold_one_1 = int(calib_num_1/2)
+            X_calib_inter_0_fold_one, X_calib_inter_0_fold_two = X_calib_inter_0[:n_fold_one_0, :], X_calib_inter_0[n_fold_one_0:, :]
+            Y_calib_inter_0_fold_one, Y_calib_inter_0_fold_two = Y_calib_inter_0[:n_fold_one_0], Y_calib_inter_0[n_fold_one_0:]
+            X_calib_inter_1_fold_one, X_calib_inter_1_fold_two = X_calib_inter_1[:n_fold_one_1, :], X_calib_inter_1[n_fold_one_1:, :]
+            Y_calib_inter_1_fold_one, Y_calib_inter_1_fold_two = Y_calib_inter_1[:n_fold_one_1], Y_calib_inter_1[n_fold_one_1:]
 
             offset_0_list, offset_1_list = [] , []
             y0_l_list, y0_u_list = [], []
@@ -370,12 +399,22 @@ class SplitCP(BaseCP):
                 Y_calib_obs_1 = self.Y_calib_obs_list[i][self.T_calib_obs_list[i]==1]
 
                 # only use one fold of calib_int data to compute weights dr model
-                D_calib_obs_0 = np.concatenate((X_calib_obs_0, Y_calib_obs_0[:, None]), axis=1)
-                D_calib_inter_0 = np.concatenate((X_calib_inter_0_fold_one, 
-                                                  Y_calib_inter_0_fold_one[:, None]), axis=1)
-                D_calib_obs_1 = np.concatenate((X_calib_obs_1, Y_calib_obs_1[:, None]), axis=1)
-                D_calib_inter_1 = np.concatenate((X_calib_inter_1_fold_one, 
-                                                  Y_calib_inter_1_fold_one[:, None]), axis=1)
+                # if dr_use_Y:
+                #     D_calib_obs_0 = np.concatenate((X_calib_obs_0, Y_calib_obs_0[:, None]), axis=1)
+                #     D_calib_inter_0 = np.concatenate((X_calib_inter_0, Y_calib_inter_0[:, None]), axis=1)
+                #     D_calib_obs_1 = np.concatenate((X_calib_obs_1, Y_calib_obs_1[:, None]), axis=1)
+                #     D_calib_inter_1 = np.concatenate((X_calib_inter_1, Y_calib_inter_1[:, None]), axis=1)
+                # else:
+                #     D_calib_obs_0 = X_calib_obs_0
+                #     D_calib_inter_0 = X_calib_inter_0
+                #     D_calib_obs_1 = X_calib_obs_1
+                #     D_calib_inter_1 = X_calib_inter_1
+
+                D_calib_obs_0, D_calib_inter_0 = utils.get_dr_data(
+                    X_calib_obs_0, Y_calib_obs_0, X_calib_inter_0, Y_calib_inter_0, dr_use_Y, self.models_pseudo_label_0[j][i], train=False)
+            
+                D_calib_obs_1, D_calib_inter_1 = utils.get_dr_data(
+                    X_calib_obs_1, Y_calib_obs_1, X_calib_inter_1, Y_calib_inter_1, dr_use_Y, self.models_pseudo_label_1[j][i], train=False)
 
                 weights_calib_obs_0 = self.density_models_0[j][i].compute_density_ratio(D_calib_obs_0)
                 weights_calib_inter_0 = self.density_models_0[j][i].compute_density_ratio(D_calib_inter_0)
@@ -386,12 +425,12 @@ class SplitCP(BaseCP):
                 scores_0 = np.maximum(self.models_l_0[j][i].predict(X_calib_obs_0) - Y_calib_obs_0,
                                        Y_calib_obs_0 - self.models_u_0[j][i].predict(X_calib_obs_0))
                 offset_0 = utils.weighted_conformal(alpha, weights_calib_obs_0, weights_calib_inter_0, scores_0)
-                offset_0_list.append(offset_0)
+                offset_0_list.append(offset_0[:n_fold_one_0])
 
                 scores_1 = np.maximum(self.models_l_1[j][i].predict(X_calib_obs_1) - Y_calib_obs_1,
                                        Y_calib_obs_1 - self.models_u_1[j][i].predict(X_calib_obs_1))
                 offset_1 = utils.weighted_conformal(alpha, weights_calib_obs_1, weights_calib_inter_1, scores_1)
-                offset_1_list.append(offset_1)
+                offset_1_list.append(offset_1[:n_fold_one_1])
 
                 y0_l = self.models_l_0[j][i].predict(X_calib_inter_0_fold_one)
                 y0_u = self.models_u_0[j][i].predict(X_calib_inter_0_fold_one)
@@ -501,6 +540,7 @@ class SplitCP(BaseCP):
                             j, alpha, 
                             ite_method="inexact"):
         
+        # naive does not care about dr_use_Y
         self.C0_l_model_ = RandomForestRegressor()
         self.C0_u_model_ = RandomForestRegressor()
         self.C1_l_model_ = RandomForestRegressor()
@@ -589,7 +629,8 @@ class SplitCP(BaseCP):
                            Y_calib_int_1,
                             i, j, alpha, 
                             ite_method="inexact", 
-                            cf_method="inexact"):
+                            cf_method="inexact",
+                            dr_use_Y:int=1):
 
         """
         cf_method: naive or our methods: [inexact, exact]
@@ -620,11 +661,20 @@ class SplitCP(BaseCP):
         
         if cf_method in ["inexact", "exact"]:
             # calibration, all use fold one
-            D_calib_obs_fold_one_0 = np.concatenate((X_calib_obs_fold_one_0, Y_calib_obs_fold_one_0[:, None]), axis=1)
-            D_calib_inter_fold_one_0 = np.concatenate((X_calib_inter_fold_one_0, Y_calib_inter_fold_one_0[:, None]), axis=1)
-            D_calib_obs_fold_one_1 = np.concatenate((X_calib_obs_fold_one_1, Y_calib_obs_fold_one_1[:, None]), axis=1)
-            D_calib_inter_fold_one_1 = np.concatenate((X_calib_inter_fold_one_1, Y_calib_inter_fold_one_1[:, None]), axis=1)
+            # D_calib_obs_fold_one_0 = np.concatenate((X_calib_obs_fold_one_0, Y_calib_obs_fold_one_0[:, None]), axis=1)
+            # D_calib_inter_fold_one_0 = np.concatenate((X_calib_inter_fold_one_0, Y_calib_inter_fold_one_0[:, None]), axis=1)
+            # D_calib_obs_fold_one_1 = np.concatenate((X_calib_obs_fold_one_1, Y_calib_obs_fold_one_1[:, None]), axis=1)
+            # D_calib_inter_fold_one_1 = np.concatenate((X_calib_inter_fold_one_1, Y_calib_inter_fold_one_1[:, None]), axis=1)
 
+
+            D_calib_obs_fold_one_0, D_calib_inter_fold_one_0 = utils.get_dr_data(
+                    X_calib_obs_fold_one_0, Y_calib_obs_fold_one_0, X_calib_inter_fold_one_0, Y_calib_inter_fold_one_0,
+                      dr_use_Y, self.models_pseudo_label_0[j][i], train=False)
+            
+            D_calib_obs_fold_one_1, D_calib_inter_fold_one_1 = utils.get_dr_data(
+                    X_calib_obs_fold_one_1, Y_calib_obs_fold_one_1, X_calib_inter_fold_one_1, Y_calib_inter_fold_one_1, 
+                    dr_use_Y, self.models_pseudo_label_0[j][i], train=False)
+           
             weights_calib_obs_fold_one_0 = self.density_models_0[j][i].compute_density_ratio(D_calib_obs_fold_one_0)
             weights_calib_inter_fold_one_0 = self.density_models_0[j][i].compute_density_ratio(D_calib_inter_fold_one_0)
             weights_calib_obs_fold_one_1 = self.density_models_1[j][i].compute_density_ratio(D_calib_obs_fold_one_1)
@@ -742,7 +792,7 @@ class SplitCP(BaseCP):
 
     def conformalize(self, alpha, 
                      ite_method='naive', 
-                     cf_method='inexact'):
+                     cf_method='inexact', dr_use_Y:int = 1):
         """
         Calibrate the predictions of the meta-learner using standard conformal prediction
         """
@@ -771,8 +821,6 @@ class SplitCP(BaseCP):
                 
                 # if ite_method == "exact":
                 #     self.offset_list = np.array(self.offset_list).reshape(self.n_folds,self.n_folds)
-            
-        
 
         elif cf_method in ['inexact', 'exact']:
                             
@@ -797,7 +845,7 @@ class SplitCP(BaseCP):
                                                 X_calib_inter_1, Y_calib_inter_1, 
                                                     i, j, alpha, 
                                                     ite_method=ite_method,
-                                                    cf_method=cf_method)
+                                                    cf_method=cf_method, dr_use_Y=dr_use_Y)
                     
                 pause = True
             

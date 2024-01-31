@@ -22,16 +22,16 @@ class MF(nn.Module):
 
         self.corY = y_unique
 
-        self.drop = nn.Dropout(dropout)
+        # self.drop = nn.Dropout(dropout)
 
         self.invP = InverP
 
         self.device = DEVICE
 
     def forward(self, u_id, i_id):
-        U = self.drop(self.user_emb(u_id))
+        U = self.user_emb(u_id)
         b_u = self.user_bias(u_id).squeeze()
-        I = self.drop(self.item_emb(i_id))
+        I = self.item_emb(i_id)
         b_i = self.item_bias(i_id).squeeze()
         return (U * I).sum(1) + b_u + b_i + self.mean
 
@@ -39,8 +39,8 @@ class MF(nn.Module):
         return self.forward(uid, iid)
 
     def get_embedding(self,u_id,i_id):
-        U = self.drop(self.user_emb(u_id))
-        I = self.drop(self.item_emb(i_id))
+        U = self.user_emb(u_id)
+        I = self.item_emb(i_id)
         return U, I
     
     def compute_ips_weights(self, u_id, i_id, y_train):

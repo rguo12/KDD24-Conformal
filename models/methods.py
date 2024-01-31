@@ -185,7 +185,9 @@ def run_conformal(df_o, df_i,
                   n_estimators:int = 10,
                   K:int = 10,
                   plot:bool = False,
-                  dataset:str = None):
+                  dataset:str = None,
+                  dr_use_Y:bool = True,
+                  seed:int=42):
     """_summary_
     Run naive CP on intervention, and our exact and inexact methods
 
@@ -209,7 +211,7 @@ def run_conformal(df_o, df_i,
     
     else:
         # test data is obs data, which does not matter as for test we consider ITE/CF Outcome
-        train_data, test_data = train_test_split(df_o, test_size=test_frac, random_state=42)
+        train_data, test_data = train_test_split(df_o, test_size=test_frac, random_state=seed)
 
     X_test = test_data.filter(like = 'X').values
     T_test = test_data[['T']].values.reshape((-1,)) 
@@ -244,11 +246,15 @@ def run_conformal(df_o, df_i,
                 X_calib_inter_1 = model.X_calib_inter_list[j][model.T_calib_inter_list[j]==1, :]
                 Y_calib_inter_1 = model.Y_calib_inter_list[j][model.T_calib_inter_list[j]==1].reshape(-1,1)
 
-                D_calib_inter_0 = np.concatenate([X_calib_inter_0, Y_calib_inter_0],axis=1)
-                D_calib_inter_1 = np.concatenate([X_calib_inter_1, Y_calib_inter_1],axis=1)
+                if dr_use_Y == 1:
+                    D_calib_inter_0 = np.concatenate([X_calib_inter_0, Y_calib_inter_0],axis=1)
+                    D_calib_inter_1 = np.concatenate([X_calib_inter_1, Y_calib_inter_1],axis=1)
+                elif dr_use_Y == 0:
+                    D_calib_inter_0 = X_calib_inter_0
+                    D_calib_inter_1 = X_calib_inter_1
 
-                plot_tsne(D_calib_inter_0, D_test, j, T=0, dataset=dataset, fig_name="xydist")
-                plot_tsne(D_calib_inter_1, D_test, j, T=1, dataset=dataset, fig_name="xydist")
+                plot_tsne(D_calib_inter_0, D_test, j, T=0, dataset=dataset, fig_name="xydist_{dr_use_Y}")
+                plot_tsne(D_calib_inter_1, D_test, j, T=1, dataset=dataset, fig_name="xydist_{dr_use_Y}")
 
     elif method == 'inexact':
         model = SplitCP(data_obs=train_data,
@@ -258,7 +264,7 @@ def run_conformal(df_o, df_i,
                     base_learner="RF", 
                     quantile_regression=quantile_regression) 
         
-        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_inexact(alpha, X_test, Y0, Y1)
+        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_inexact(alpha, X_test, Y0, Y1, dr_use_Y)
         coverage_0, coverage_1, interval_width_0, interval_width_1 = eval_po(Y1,Y0,C0_l,C0_u,C1_l,C1_u)
 
     
@@ -270,7 +276,7 @@ def run_conformal(df_o, df_i,
             base_learner="RF", 
             quantile_regression=quantile_regression)
         
-        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_exact(alpha / 2, X_test, Y0, Y1)
+        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_exact(alpha / 2, X_test, Y0, Y1, dr_use_Y)
         coverage_0, coverage_1, interval_width_0, interval_width_1 = eval_po(Y1,Y0,C0_l,C0_u,C1_l,C1_u)
 
     
@@ -297,12 +303,11 @@ def run_conformal(df_o, df_i,
     res['interval_width_0'] = interval_width_0
     res['interval_width_1'] = interval_width_1
 
-    
-    # we consider all 3 ite_methods
+    # we consider all 3 ite evaluation methods
     
     # ite_method = naive
     print('ite_method = naive...')
-    model.conformalize(alpha, ite_method='naive', cf_method=method)
+    model.conformalize(alpha, ite_method='naive', cf_method=method, dr_use_Y=dr_use_Y)
 
     C0 = [C0_l, C0_u]
     C1 = [C1_l, C1_u]
@@ -319,39 +324,47 @@ def run_conformal(df_o, df_i,
     res['coverage_ITE_naive'] = coverage_ITE
     res['interval_width_ITE_naive'] = interval_width_ITE
 
-    # elif target == 'nested_inexact':
-    print('ite_method = inexact...')
-    model.reset_tilde_C_ITE_models(cf_method=method)
-    model.conformalize(alpha, 
-                     ite_method='inexact', 
-                     cf_method=method)
-    CI_ITE_l, CI_ITE_u = model.predict_ITE(alpha, X_test, C0, C1, 
-                    ite_method='inexact', 
-                    cf_method=method)
-    coverage_ITE = np.mean((ITE_test >= CI_ITE_l) & (ITE_test <= CI_ITE_u))
-    interval_width_ITE = np.mean(np.abs(CI_ITE_u - CI_ITE_l))
-    print('Coverage of ITE (nested inexact)', coverage_ITE)
-    print('Interval width of ITE (nested inexact)', interval_width_ITE)
+    if method != 'TCP':
+        # elif target == 'nested_inexact':
+        print('ite_method = inexact...')
+        model.reset_tilde_C_ITE_models(cf_method=method)
+        model.conformalize(alpha, 
+                        ite_method='inexact', 
+                        cf_method=method, dr_use_Y=dr_use_Y)
+        CI_ITE_l, CI_ITE_u = model.predict_ITE(alpha, X_test, C0, C1, 
+                        ite_method='inexact', 
+                        cf_method=method)
+        coverage_ITE = np.mean((ITE_test >= CI_ITE_l) & (ITE_test <= CI_ITE_u))
+        interval_width_ITE = np.mean(np.abs(CI_ITE_u - CI_ITE_l))
+        print('Coverage of ITE (nested inexact)', coverage_ITE)
+        print('Interval width of ITE (nested inexact)', interval_width_ITE)
 
-    res['coverage_ITE_inexact'] = coverage_ITE
-    res['interval_width_ITE_inexact'] = interval_width_ITE
-    
-    # elif target == 'nested_exact':
-    print('ite_method = exact...')
+        res['coverage_ITE_inexact'] = coverage_ITE
+        res['interval_width_ITE_inexact'] = interval_width_ITE
+        
+        # elif target == 'nested_exact':
+        print('ite_method = exact...')
 
-    model.reset_tilde_C_ITE_models(cf_method=method)
-    model.conformalize(alpha / 2, 
-                     ite_method='exact', 
-                     cf_method=method)
-    CI_ITE_l, CI_ITE_u = model.predict_ITE(alpha / 2, X_test, C0, C1,
-                                             ite_method='exact', cf_method=method)
-    coverage_ITE = np.mean((ITE_test >= CI_ITE_l) & (ITE_test <= CI_ITE_u))
-    interval_width_ITE = np.mean(np.abs(CI_ITE_u - CI_ITE_l))
-    print('Coverage of ITE (nested exact)', coverage_ITE)
-    print('Interval width of ITE (nested exact)', interval_width_ITE)
-    
-    res['coverage_ITE_exact'] = coverage_ITE
-    res['interval_width_ITE_exact'] = interval_width_ITE
+        model.reset_tilde_C_ITE_models(cf_method=method)
+        model.conformalize(alpha / 2, 
+                        ite_method='exact', 
+                        cf_method=method, dr_use_Y=dr_use_Y)
+        CI_ITE_l, CI_ITE_u = model.predict_ITE(alpha / 2, X_test, C0, C1,
+                                                ite_method='exact', cf_method=method)
+        coverage_ITE = np.mean((ITE_test >= CI_ITE_l) & (ITE_test <= CI_ITE_u))
+        interval_width_ITE = np.mean(np.abs(CI_ITE_u - CI_ITE_l))
+        print('Coverage of ITE (nested exact)', coverage_ITE)
+        print('Interval width of ITE (nested exact)', interval_width_ITE)
+        
+        res['coverage_ITE_exact'] = coverage_ITE
+        res['interval_width_ITE_exact'] = interval_width_ITE
+        
+    else:
+        res['coverage_ITE_inexact'] = 0.0
+        res['interval_width_ITE_inexact'] = 0.0
+        res['coverage_ITE_exact'] = 0.0
+        res['interval_width_ITE_exact'] = 0.0
+
     pause = True
 
     return res

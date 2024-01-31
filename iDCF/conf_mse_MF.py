@@ -9,17 +9,25 @@ from tune_script import *
 from evaluator import Evaluator, mf_evaluate
 from seeds import test_seeds
 
+from datetime import datetime
+
 from tqdm import tqdm
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 import os
 os.environ["CUDA_LAUNCH_BLOCKING"] = '1'
 
-def train_eval(config):
-    print(config)
 
-    metric = config["metric"]
+# Generate current date in MM-DD format
+current_date = datetime.now().strftime("%m_%d")
+current_time = datetime.now().strftime("%H:%M:%S")
+
+def train_eval(config):
+
+    # metric = config["metric"]
     method = config["method"]
+
+    print(f"running experiments for {method}")
 
     val_obs_loaders = []
     val_int_loaders = []
@@ -46,7 +54,7 @@ def train_eval(config):
             val_loader = val_int_loader
             
         else:
-            raise ValueError("Unknown method")
+            raise ValueError(f"Unknown method {method}")
         
         seed_everything(config["seed"]+i) # make sure each fold is different
 
@@ -88,10 +96,10 @@ def train_eval(config):
             total_loss = 0
             total_len = 0
 
+            model.train()
+
             for index, (uid, iid, rating) in enumerate(train_loader):
-                
-                model.train()
-                
+                                
                 uid, iid, rating = uid.to(DEVICE), iid.to(DEVICE), rating.float().to(DEVICE)
 
                 # predict_u = model_u(uid, iid).view(-1)
@@ -147,7 +155,9 @@ def train_eval(config):
                                                       train_int_loader, 
                                                     model, method,
                                                     device=DEVICE,
-                                                    dr_model=config["dr_model"])
+                                                    dr_model=config["dr_model"],
+                                                    mix_method=config["mix_method"],
+                                                    dr_use_Y=config["dr_use_Y"])
             
             print("finished training density ratio model")
         dr_model_list.append(density_ratio_model)
@@ -156,7 +166,7 @@ def train_eval(config):
     if method in ["exact", "inexact"]:
         # use val_obs as calibration, test_int as test
 
-        ts_coverages, ts_inter_widths = mf_conf_eval_splitcp_mse(val_obs_loaders,
+        ts_coverages, ts_inter_widths = mf_conf_eval_splitcp_mse(config,val_obs_loaders,
                                                              val_int_loaders, 
                                                             test_int_loaders, 
                                                             model_list,
@@ -164,25 +174,29 @@ def train_eval(config):
                                                             method,
                                                             device=DEVICE, 
                                                             params=evaluation_params,
-                                                            alpha=0.1, 
+                                                            alpha=config["alpha"], 
                                                             standardize=config["standardize"],
                                                                 dr_model=config["dr_model"], 
-                                                                dataset=config["data_params"]["name"])
+                                                                dataset=config["data_params"]["name"],
+                                                                mix_method=config["mix_method"],
+                                                                dr_use_Y=config["dr_use_Y"])
         
     elif method == "naive":
         ts_coverages, ts_inter_widths = mf_conf_eval_naive_mse(
-                val_int_loaders, test_int_loaders, model_list, method,
+                config, val_int_loaders, test_int_loaders, model_list, method,
                  device=DEVICE, params=evaluation_params, 
-                 alpha=0.1, standardize=config["standardize"], dataset=config["data_params"]["name"])
+                 alpha=config["alpha"], 
+                 standardize=config["standardize"], 
+                 dataset=config["data_params"]["name"])
 
 
     elif method in ["wcp", "wcp_ips"]:
-        ts_coverages, ts_inter_widths = mf_conf_eval_wcp_mse(
+        ts_coverages, ts_inter_widths = mf_conf_eval_wcp_mse(config,
                 val_obs_loaders, val_int_loaders, test_int_loaders, 
                 model_list, dr_model_list, method,
                  device=DEVICE, params=evaluation_params, 
-                 alpha=0.1, standardize=config["standardize"], dr_model=config["dr_model"],
-                   dataset=config["data_params"]["name"])
+                 alpha=config["alpha"], standardize=config["standardize"], dr_model=config["dr_model"],
+                   dataset=config["data_params"]["name"], mix_method=config["mix_method"])
     
     n_folds = len(ts_coverages)
     for i in range(n_folds):
@@ -198,10 +212,9 @@ def train_eval(config):
             "n_test_int": config['n_test_int'],
             }
 
-        run_name = f"{random_number}_{config['method']}_{config['dr_model']}_seed_{config['seed']}"
+        run_name = f"{current_date}/{current_time}_{config['method']}_{config['dr_model']}_seed_{config['seed']}"
 
         save_rec_results(config, results, run_name)
-    
     
     # print(results)
 
@@ -286,23 +299,28 @@ if __name__ == '__main__':
         "patience": args.patience,
         "lr_rate": 5e-4,
         "weight_decay": 1e-6,
-        "epochs": 1,
+        "epochs": args.epochs,
         "batch_size": args.data_params["batch_size"],
-        "embedding_dim": 64,
+        "embedding_dim": args.embedding_dim,
         "topk": args.topk,
         "seed": args.seed,
         "n_folds": args.n_folds,
-        "exact": args.exact,
         "dr_model":args.dr_model,
         "standardize":args.standardize,
         "method": args.method,
         "save_path": args.save_path,
+        "alpha": args.alpha,
+        "mix_method": args.mix_method,
+        "dr_use_Y": args.dr_use_Y,
     }
 
     sample_config["data_params"]["test_ratio"] = args.test_ratio
+    sample_config["data_params"]["val_ratio"] = args.val_ratio
     sample_config["data_params"]["train_ratio"] = args.train_ratio
-
-    sample_config["data_params"]["obs_test_ratio"] = args.obs_test_ratio
+    
     sample_config["data_params"]["obs_train_ratio"] = args.obs_train_ratio
+    sample_config["data_params"]["obs_val_ratio"] = args.obs_val_ratio
+    sample_config["data_params"]["obs_test_ratio"] = 1 - args.obs_train_ratio - args.obs_val_ratio
+
 
     train_eval(sample_config)
