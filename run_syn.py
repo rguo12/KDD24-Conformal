@@ -31,9 +31,9 @@ def get_config():
     # parser.add_argument('--output_folder', type=str, default=None) # keep it as None for local exp
 
     # Model settings
-    parser.add_argument('--method', type=str, default='wcp')
+    parser.add_argument('--method', type=str, default='inexact')
 
-    parser.add_argument('--dr_use_Y', type=int, default=2, help="0: not use Y, 1: use Y, 2: use pseudo label")
+    parser.add_argument('--dr_use_Y', type=int, default=0, help="0: not use Y, 1: use Y, 2: use pseudo label")
 
     parser.add_argument('--base_learner', type=str, default="GBM")
     parser.add_argument('--density_ratio_model', type=str, default="DR")
@@ -74,10 +74,12 @@ def main(args):
     n_folds = args.n_folds
     err_scale = 0.1
 
-    if args.dr_use_Y > 0:
-        dr_use_Y = True
-    else:
-        dr_use_Y = False
+    dr_use_Y = args.dr_use_Y
+
+    # if args.dr_use_Y > 0:
+    #     dr_use_Y = True
+    # else:
+    #     dr_use_Y = False
         
     # df_train, df_test = generate_lilei_hua_data()
     # _ = weighted_conformal_prediction([df_train, df_test], 
@@ -134,8 +136,7 @@ def main(args):
         
         # naive baseline
         if 'naive' == args.method:
-            res = run_conformal(
-                                df_o,
+            res = run_conformal(df_o,
                                 df_i,
                                 quantile_regression=True,
                                 n_folds=n_folds, #controls calib
@@ -175,7 +176,7 @@ def main(args):
                                 method = 'exact',
                                 dr_use_Y=dr_use_Y)
             
-            utils.save_results(args, res, n_intervention, n_observation, cur_time, cur_time, random_number)
+            utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
 
         if 'wcp' == args.method:
             res = weighted_conformal_prediction(df_o, 
@@ -208,13 +209,9 @@ def main(args):
             #                                                                                 quantile_regression=True, 
             #                                                                                 alpha=0.1, 
             
-        print(
-            f"n_obs_treated: {n_obs_treated}, n_obs_controlled: {n_obs_controlled}, n_inter_treated: {n_inter_treated}, n_inter_controlled: {n_inter_controlled}")
-        
-
-
+        print(f"n_obs_treated: {n_obs_treated}, n_obs_controlled: {n_obs_controlled}, n_inter_treated: {n_inter_treated}, n_inter_controlled: {n_inter_controlled}")
+    
     pause = True
-    return
 
 
 if __name__ == '__main__':

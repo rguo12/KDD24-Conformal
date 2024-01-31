@@ -186,7 +186,7 @@ def run_conformal(df_o, df_i,
                   K:int = 10,
                   plot:bool = False,
                   dataset:str = None,
-                  dr_use_Y:bool = True,
+                  dr_use_Y:int = 1,
                   seed:int=42):
     """_summary_
     Run naive CP on intervention, and our exact and inexact methods
@@ -264,7 +264,7 @@ def run_conformal(df_o, df_i,
                     base_learner="RF", 
                     quantile_regression=quantile_regression) 
         
-        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_inexact(alpha, X_test, Y0, Y1, dr_use_Y)
+        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_inexact(alpha, X_test, Y0, Y1, dr_use_Y=dr_use_Y)
         coverage_0, coverage_1, interval_width_0, interval_width_1 = eval_po(Y1,Y0,C0_l,C0_u,C1_l,C1_u)
 
     
@@ -276,7 +276,7 @@ def run_conformal(df_o, df_i,
             base_learner="RF", 
             quantile_regression=quantile_regression)
         
-        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_exact(alpha / 2, X_test, Y0, Y1, dr_use_Y)
+        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_exact(alpha / 2, X_test, Y0, Y1, dr_use_Y=dr_use_Y)
         coverage_0, coverage_1, interval_width_0, interval_width_1 = eval_po(Y1,Y0,C0_l,C0_u,C1_l,C1_u)
 
     

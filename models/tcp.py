@@ -267,7 +267,7 @@ class SplitCP(BaseCP):
 
     def predict_counterfactual_inexact(self, alpha, X_test, Y0, Y1, dr_model = "DR", dr_use_Y:int = 1):
         print("Fitting models ... ")
-        self.fit(method='two_stage_inexact')
+        self.fit(method='two_stage_inexact', dr_use_Y=dr_use_Y)
         print("Fitting models done. ")
         
         C_calib_u_0, C_calib_l_0 = [], []
@@ -364,7 +364,7 @@ class SplitCP(BaseCP):
     
     def predict_counterfactual_exact(self, alpha, X_test, Y0, Y1, dr_use_Y:bool=True):
         print("Fitting models ... ")
-        self.fit(method='two_stage_exact')
+        self.fit(method='two_stage_exact', dr_use_Y=dr_use_Y)
         print("Fitting models done. ")
         
         C_calib_u_0, C_calib_l_0 = [], []
