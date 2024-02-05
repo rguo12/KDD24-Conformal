@@ -660,10 +660,14 @@ class SplitCP(BaseCP):
         train models to predict upper lower bound of ITE using inexact method
         """
 
-        X_calib_obs_fold_one_0, X_calib_obs_fold_two_0, Y_calib_obs_fold_one_0, Y_calib_fold_obs_two_0 = train_test_split(
-            X_calib_obs_0, Y_calib_obs_0, test_size=0.5, random_state=42)
-        X_calib_obs_fold_one_1, X_calib_obs_fold_two_1, Y_calib_obs_fold_one_1, Y_calib_fold_obs_two_1 = train_test_split(
-            X_calib_obs_1, Y_calib_obs_1, test_size=0.5, random_state=42)
+        # fold two of calib_obs is not used...
+        X_calib_obs_fold_one_0, Y_calib_obs_fold_one_0 = X_calib_obs_0, Y_calib_obs_0
+        X_calib_obs_fold_one_1, Y_calib_obs_fold_one_1 = X_calib_obs_1, Y_calib_obs_1
+
+        # X_calib_obs_fold_one_0, X_calib_obs_fold_two_0, Y_calib_obs_fold_one_0, Y_calib_fold_obs_two_0 = train_test_split(
+        #     X_calib_obs_0, Y_calib_obs_0, test_size=0.95, random_state=42)
+        # X_calib_obs_fold_one_1, X_calib_obs_fold_two_1, Y_calib_obs_fold_one_1, Y_calib_fold_obs_two_1 = train_test_split(
+        #     X_calib_obs_1, Y_calib_obs_1, test_size=0.95, random_state=42)
 
         X_calib_inter_fold_one_0, X_calib_inter_fold_two_0, Y_calib_inter_fold_one_0, Y_calib_inter_fold_two_0 = train_test_split(
             X_calib_int_0, Y_calib_int_0, test_size=0.5, random_state=42)
@@ -807,15 +811,14 @@ class SplitCP(BaseCP):
 
             # calibrate upper lower bounds separately, treated as point estimate
             scores_u = np.abs(C_u_calib - self.tilde_C_ITE_model_u[j][i].predict(X_calib))
-            scores_l = np.abs(C_l_calib - self.tilde_C_ITE_model_l[j][i].predict(X_calib)) 
+            scores_l = np.abs(C_l_calib - self.tilde_C_ITE_model_l[j][i].predict(X_calib))
             
             offset_u = utils.standard_conformal(alpha, scores_u)
             offset_l = utils.standard_conformal(alpha, scores_l)
             
             self.offset_u_list.append(offset_u)
             self.offset_l_list.append(offset_l)
-            # self.offset_list.append(np.concatenate([offset_u, offset_l]),axis=1)
-
+            
 
     def conformalize(self, alpha, 
                      ite_method='naive', 
@@ -877,7 +880,8 @@ class SplitCP(BaseCP):
                                                 X_calib_inter_1, Y_calib_inter_1, 
                                                     i, j, alpha, 
                                                     ite_method=ite_method,
-                                                    cf_method=cf_method, dr_use_Y=dr_use_Y)
+                                                    cf_method=cf_method, 
+                                                    dr_use_Y=dr_use_Y)
                 
                 pause = True
             
