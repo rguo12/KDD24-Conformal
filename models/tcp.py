@@ -105,22 +105,30 @@ class BaseCP:
         pass
 
 
-    def reset_tilde_C_ITE_models(self, cf_method):
+    def reset_tilde_C_ITE_models(self, cf_method:str, n_estimators:int=100):
         # for ITE estimation
-        n_estimators_target = 100
+        # using MSE loss
+        
+        # if self.base_learner == "GBM":
+        #     second_CQR_args_u = dict({"loss": "quantile", "alpha":0.6, "n_estimators": n_estimators_target})
+        #     second_CQR_args_l = dict({"loss": "quantile", "alpha":0.4, "n_estimators": n_estimators_target})
+        # elif self.base_learner == "RF":
+        #     second_CQR_args_u = dict({"default_quantiles":0.6, "n_estimators": n_estimators_target}) 
+        #     second_CQR_args_l = dict({"default_quantiles":0.4, "n_estimators": n_estimators_target})
+
         if self.base_learner == "GBM":
-            second_CQR_args_u = dict({"loss": "quantile", "alpha":0.6, "n_estimators": n_estimators_target})
-            second_CQR_args_l = dict({"loss": "quantile", "alpha":0.4, "n_estimators": n_estimators_target})
+            first_CQR_args = dict({"loss": "squared_error", "n_estimators": n_estimators}) 
         elif self.base_learner == "RF":
-            second_CQR_args_u = dict({"default_quantiles":0.6, "n_estimators": n_estimators_target}) 
-            second_CQR_args_l = dict({"default_quantiles":0.4, "n_estimators": n_estimators_target})
+            first_CQR_args = dict({"criterion": "squared_error", "n_estimators": n_estimators}) 
+        else:
+            raise ValueError('base_learner must be one of GBM or RF')
         
         if cf_method == "naive":
-            self.tilde_C_ITE_model_u = [base_learners_dict[self.base_learner](**second_CQR_args_u) for _ in range(self.n_folds)] 
-            self.tilde_C_ITE_model_l = [base_learners_dict[self.base_learner](**second_CQR_args_l) for _ in range(self.n_folds)] 
+            self.tilde_C_ITE_model_u = [base_learners_dict[self.base_learner](**first_CQR_args) for _ in range(self.n_folds)] 
+            self.tilde_C_ITE_model_l = [base_learners_dict[self.base_learner](**first_CQR_args) for _ in range(self.n_folds)] 
         elif cf_method in ["exact", "inexact"]:
-            self.tilde_C_ITE_model_u = [[base_learners_dict[self.base_learner](**second_CQR_args_u) for _ in range(self.n_folds)]for _ in range(self.n_folds)] 
-            self.tilde_C_ITE_model_l = [[base_learners_dict[self.base_learner](**second_CQR_args_l) for _ in range(self.n_folds)]for _ in range(self.n_folds)] 
+            self.tilde_C_ITE_model_u = [[base_learners_dict[self.base_learner](**first_CQR_args) for _ in range(self.n_folds)]for _ in range(self.n_folds)] 
+            self.tilde_C_ITE_model_l = [[base_learners_dict[self.base_learner](**first_CQR_args) for _ in range(self.n_folds)]for _ in range(self.n_folds)] 
         
 
     # def predict_counterfactual_inexact(self, alpha, X_test, Y0, Y1):
@@ -302,10 +310,12 @@ class SplitCP(BaseCP):
                 #     D_calib_inter_1 = X_calib_inter_1
 
                 D_calib_obs_0, D_calib_inter_0 = utils.get_dr_data(
-                    X_calib_obs_0, Y_calib_obs_0, X_calib_inter_0, Y_calib_inter_0, dr_use_Y, self.models_pseudo_label_0[j][i], train=False)
+                    X_calib_obs_0, Y_calib_obs_0, X_calib_inter_0, Y_calib_inter_0, 
+                    dr_use_Y, self.models_pseudo_label_0[j][i], train=False)
             
                 D_calib_obs_1, D_calib_inter_1 = utils.get_dr_data(
-                    X_calib_obs_1, Y_calib_obs_1, X_calib_inter_1, Y_calib_inter_1, dr_use_Y, self.models_pseudo_label_1[j][i], train=False)
+                    X_calib_obs_1, Y_calib_obs_1, X_calib_inter_1, Y_calib_inter_1, 
+                    dr_use_Y, self.models_pseudo_label_1[j][i], train=False)
 
                 weights_calib_obs_0 = self.density_models_0[j][i].compute_density_ratio(D_calib_obs_0)
                 weights_calib_inter_0 = self.density_models_0[j][i].compute_density_ratio(D_calib_inter_0)
@@ -583,7 +593,6 @@ class SplitCP(BaseCP):
         # y1_u = self.models_u_1[j][i].predict(X_calib_inter_fold_two_0) + offset_1
         # y1_l = self.models_l_1[j][i].predict(X_calib_inter_fold_two_0) - offset_1
 
-        # we use interventional data here because our offsets are for interventional data
         C1_u = y1_u - Y_calib_inter_fold_two_0
         C1_l = y1_l - Y_calib_inter_fold_two_0
         
@@ -599,6 +608,7 @@ class SplitCP(BaseCP):
         dummy_index = np.random.permutation(len(X_calib_inter_fold_two_0) + len(X_calib_inter_fold_two_1))
 
         if ite_method == "inexact":
+            # ITE upper lower bound models
             self.tilde_C_ITE_model_l[j].fit(np.concatenate((X_calib_inter_fold_two_0, X_calib_inter_fold_two_1))[dummy_index, :],
                                         np.concatenate((C1_l, C0_l))[dummy_index])
                                         
@@ -617,10 +627,20 @@ class SplitCP(BaseCP):
             self.tilde_C_ITE_model_l[j].fit(X_train, C_l_train)                                                
             self.tilde_C_ITE_model_u[j].fit(X_train, C_u_train)
 
-            scores = np.maximum(C_u_calib - self.tilde_C_ITE_model_u[j].predict(X_calib), 
-                                    self.tilde_C_ITE_model_l[j].predict(X_calib) - C_l_calib)
-            offset = utils.standard_conformal(alpha, scores)
-            self.offset_list.append(offset)
+            # scores = np.maximum(C_u_calib - self.tilde_C_ITE_model_u[j].predict(X_calib), 
+            #                         self.tilde_C_ITE_model_l[j].predict(X_calib) - C_l_calib)
+            # offset = utils.standard_conformal(alpha, scores)
+            # self.offset_list.append(offset)
+
+            # calibrate upper lower bounds separately, treated as point estimate
+            scores_u = np.abs(C_u_calib - self.tilde_C_ITE_model_u[j].predict(X_calib))
+            scores_l = np.abs(C_l_calib - self.tilde_C_ITE_model_l[j].predict(X_calib)) 
+            
+            offset_u = utils.standard_conformal(alpha, scores_u)
+            offset_l = utils.standard_conformal(alpha, scores_l)
+            
+            self.offset_u_list.append(offset_u)
+            self.offset_l_list.append(offset_l)
 
 
     def conformalize_one_fold(self, X_calib_obs_0, Y_calib_obs_0, X_calib_obs_1,
@@ -661,11 +681,6 @@ class SplitCP(BaseCP):
         
         if cf_method in ["inexact", "exact"]:
             # calibration, all use fold one
-            # D_calib_obs_fold_one_0 = np.concatenate((X_calib_obs_fold_one_0, Y_calib_obs_fold_one_0[:, None]), axis=1)
-            # D_calib_inter_fold_one_0 = np.concatenate((X_calib_inter_fold_one_0, Y_calib_inter_fold_one_0[:, None]), axis=1)
-            # D_calib_obs_fold_one_1 = np.concatenate((X_calib_obs_fold_one_1, Y_calib_obs_fold_one_1[:, None]), axis=1)
-            # D_calib_inter_fold_one_1 = np.concatenate((X_calib_inter_fold_one_1, Y_calib_inter_fold_one_1[:, None]), axis=1)
-
 
             D_calib_obs_fold_one_0, D_calib_inter_fold_one_0 = utils.get_dr_data(
                     X_calib_obs_fold_one_0, Y_calib_obs_fold_one_0, X_calib_inter_fold_one_0, Y_calib_inter_fold_one_0,
@@ -680,8 +695,8 @@ class SplitCP(BaseCP):
             weights_calib_obs_fold_one_1 = self.density_models_1[j][i].compute_density_ratio(D_calib_obs_fold_one_1)
             weights_calib_inter_fold_one_1 = self.density_models_1[j][i].compute_density_ratio(D_calib_inter_fold_one_1)
 
-            # calib with factual obs data, reweighting use obs+int data
-            # the same as predict_counterfactual_inexact, except the data
+            # calib with calib_obs data, reweighting use obs+int data
+            # the same as inference in predict_counterfactual_inexact, except the data
             scores_0 = np.maximum(
                 self.models_l_0[j][i].predict(X_calib_obs_fold_one_0) - Y_calib_obs_fold_one_0,
                 Y_calib_obs_fold_one_0 - self.models_u_0[j][i].predict(X_calib_obs_fold_one_0))
@@ -705,43 +720,44 @@ class SplitCP(BaseCP):
             y1_l = self.models_l_1[j][i].predict(X_calib_inter_fold_two_0) - offset_1
             y1_u = self.models_u_1[j][i].predict(X_calib_inter_fold_two_0) + offset_1
 
-            if cf_method == 'exact':
-                self.C0_l_model_ = RandomForestRegressor()
-                self.C0_u_model_ = RandomForestRegressor()
-                self.C1_l_model_ = RandomForestRegressor()
-                self.C1_u_model_ = RandomForestRegressor()
-                # will lead to a wider interval than inexact
+            # if cf_method == 'exact':
+            #     self.C0_l_model_ = RandomForestRegressor()
+            #     self.C0_u_model_ = RandomForestRegressor()
+            #     self.C1_l_model_ = RandomForestRegressor()
+            #     self.C1_u_model_ = RandomForestRegressor()
+            #     # will lead to a wider interval than inexact
 
-                # TODO: further split the data s.t. 
-                # here we use factual to fit the QR models for PO intervals
-                y0_l_f = self.models_l_0[j][i].predict(X_calib_inter_fold_two_0) - offset_0
-                y0_u_f = self.models_u_0[j][i].predict(X_calib_inter_fold_two_0) + offset_0
+            #     # TODO: further split the data into 3 folds
+            #     # here we use factual to fit the QR models for PO intervals
+            #     y0_l_f = self.models_l_0[j][i].predict(X_calib_inter_fold_two_0) - offset_0
+            #     y0_u_f = self.models_u_0[j][i].predict(X_calib_inter_fold_two_0) + offset_0
 
-                y1_l_f = self.models_l_1[j][i].predict(X_calib_inter_fold_two_1) - offset_1
-                y1_u_f = self.models_u_1[j][i].predict(X_calib_inter_fold_two_1) + offset_1
+            #     y1_l_f = self.models_l_1[j][i].predict(X_calib_inter_fold_two_1) - offset_1
+            #     y1_u_f = self.models_u_1[j][i].predict(X_calib_inter_fold_two_1) + offset_1
 
-                # use fold one of calib_int data to fit regression on y_u and y_l
-                self.C0_l_model_.fit(X_calib_inter_fold_two_0, y0_l_f)
-                self.C0_u_model_.fit(X_calib_inter_fold_two_0, y0_u_f)
-                self.C1_l_model_.fit(X_calib_inter_fold_two_1, y1_l_f)
-                self.C1_u_model_.fit(X_calib_inter_fold_two_1, y1_u_f)
+            #     # use fold one of calib_int data to fit regression on y_u and y_l
+            #     self.C0_l_model_.fit(X_calib_inter_fold_two_0, y0_l_f)
+            #     self.C0_u_model_.fit(X_calib_inter_fold_two_0, y0_u_f)
+            #     self.C1_l_model_.fit(X_calib_inter_fold_two_1, y1_l_f)
+            #     self.C1_u_model_.fit(X_calib_inter_fold_two_1, y1_u_f)
 
-                scores_C0 = np.maximum(self.C0_l_model.predict(X_calib_inter_fold_two_0) - Y_calib_inter_fold_two_0, 
-                                    Y_calib_inter_fold_two_0 - self.C0_u_model.predict(X_calib_inter_fold_two_0))
-                offset_C0 = utils.standard_conformal(alpha, scores_C0)
+            #     scores_C0 = np.maximum(self.C0_l_model.predict(X_calib_inter_fold_two_0) - Y_calib_inter_fold_two_0, 
+            #                         Y_calib_inter_fold_two_0 - self.C0_u_model.predict(X_calib_inter_fold_two_0))
+            #     offset_C0 = utils.standard_conformal(alpha, scores_C0)
 
-                scores_C1 = np.maximum(self.C1_l_model.predict(X_calib_inter_fold_two_1) - Y_calib_inter_fold_two_1, 
-                                    Y_calib_inter_fold_two_1 - self.C1_u_model.predict(X_calib_inter_fold_two_1))
-                offset_C1 = utils.standard_conformal(alpha, scores_C1)
+            #     scores_C1 = np.maximum(self.C1_l_model.predict(X_calib_inter_fold_two_1) - Y_calib_inter_fold_two_1, 
+            #                         Y_calib_inter_fold_two_1 - self.C1_u_model.predict(X_calib_inter_fold_two_1))
+            #     offset_C1 = utils.standard_conformal(alpha, scores_C1)
 
-                # override predicted upper lower bounds of cf outcomes
-                # ideally, we should use fold 3 for this
-                # X_calib_inter_fold_three_1 = X_calib_inter_fold_two_1
-                # X_calib_inter_fold_three_0 = X_calib_inter_fold_two_0
-                y0_l = self.C0_l_model_.predict(X_calib_inter_fold_two_1) - offset_C0
-                y0_u = self.C0_u_model_.predict(X_calib_inter_fold_two_1) + offset_C0
-                y1_l = self.C1_l_model_.predict(X_calib_inter_fold_two_0) - offset_C1
-                y1_u = self.C1_u_model_.predict(X_calib_inter_fold_two_0) + offset_C1
+            #     # override predicted upper lower bounds of cf outcomes
+            #     # ideally, we should use fold 3 for this
+            #     # X_calib_inter_fold_three_1 = X_calib_inter_fold_two_1
+            #     # X_calib_inter_fold_three_0 = X_calib_inter_fold_two_0
+            #     y0_l = self.C0_l_model_.predict(X_calib_inter_fold_two_1) - offset_C0
+            #     y0_u = self.C0_u_model_.predict(X_calib_inter_fold_two_1) + offset_C0
+            #     y1_l = self.C1_l_model_.predict(X_calib_inter_fold_two_0) - offset_C1
+            #     y1_u = self.C1_u_model_.predict(X_calib_inter_fold_two_0) + offset_C1
+
         else:
             raise ValueError("cf_method has to be in [inexact, exact]")
         # compute ITE
@@ -751,27 +767,28 @@ class SplitCP(BaseCP):
         # y1_u = self.models_u_1[j][i].predict(X_calib_inter_fold_two_0) + offset_1
         # y1_l = self.models_l_1[j][i].predict(X_calib_inter_fold_two_0) - offset_1
 
-        # we use interventional data here because our offsets are for interventional data
+        # we use interventional data here because it is iid to test data
+        # bounds for ITE, here C1 means the observed treatment is 1 for the unit
         C1_u = y1_u - Y_calib_inter_fold_two_0
         C1_l = y1_l - Y_calib_inter_fold_two_0
         
-        # This is first line in Table 3 of Lei and Candes
+        # This is first line in Algo 3 of Lei and Candes
         # Note that C0 is for fold 2 of the treated group
-
-        # y0_u = self.models_u_0[j][i].predict(X_calib_inter_fold_two_1) + offset_0
-        # y0_l = self.models_l_0[j][i].predict(X_calib_inter_fold_two_1) - offset_0
         
+        # C_ITE for T=1 in calib_inter_fold_two
         C0_u = Y_calib_inter_fold_two_1 - y0_l
         C0_l = Y_calib_inter_fold_two_1 - y0_u
 
         dummy_index = np.random.permutation(len(X_calib_inter_fold_two_0) + len(X_calib_inter_fold_two_1))
 
         if ite_method == "inexact":
+            # C_l means lower bound of ITE
             self.tilde_C_ITE_model_l[j][i].fit(np.concatenate((X_calib_inter_fold_two_0, X_calib_inter_fold_two_1))[dummy_index, :],
                                         np.concatenate((C1_l, C0_l))[dummy_index])
                                         
             self.tilde_C_ITE_model_u[j][i].fit(np.concatenate((X_calib_inter_fold_two_0, X_calib_inter_fold_two_1))[dummy_index, :], 
                                             np.concatenate((C1_u, C0_u))[dummy_index])
+
 
         elif ite_method == "exact":
             C_l = np.concatenate((C1_l, C0_l))[dummy_index]
@@ -780,15 +797,25 @@ class SplitCP(BaseCP):
                                 X_calib_inter_fold_two_1))[dummy_index, :]
             
             X_train, X_calib, C_l_train, C_l_calib, C_u_train, C_u_calib = train_test_split(
-                X, C_l, C_u, test_size=0.25, random_state=42)
+                X, C_l, C_u, test_size=0.5, random_state=42)
 
             self.tilde_C_ITE_model_l[j][i].fit(X_train, C_l_train)                                                
             self.tilde_C_ITE_model_u[j][i].fit(X_train, C_u_train)
 
-            scores = np.maximum(C_u_calib - self.tilde_C_ITE_model_u[j][i].predict(X_calib), 
-                                    self.tilde_C_ITE_model_l[j][i].predict(X_calib) - C_l_calib)
-            offset = utils.standard_conformal(alpha, scores)
-            self.offset_list.append(offset)
+            # scores = np.maximum(C_u_calib - self.tilde_C_ITE_model_u[j][i].predict(X_calib), 
+                                    # self.tilde_C_ITE_model_l[j][i].predict(X_calib) - C_l_calib)
+
+            # calibrate upper lower bounds separately, treated as point estimate
+            scores_u = np.abs(C_u_calib - self.tilde_C_ITE_model_u[j][i].predict(X_calib))
+            scores_l = np.abs(C_l_calib - self.tilde_C_ITE_model_l[j][i].predict(X_calib)) 
+            
+            offset_u = utils.standard_conformal(alpha, scores_u)
+            offset_l = utils.standard_conformal(alpha, scores_l)
+            
+            self.offset_u_list.append(offset_u)
+            self.offset_l_list.append(offset_l)
+            # self.offset_list.append(np.concatenate([offset_u, offset_l]),axis=1)
+
 
     def conformalize(self, alpha, 
                      ite_method='naive', 
@@ -802,9 +829,12 @@ class SplitCP(BaseCP):
             return
 
         if cf_method == 'naive':
-            self.offset_list = []
+            self.offset_u_list = []
+            self.offset_l_list = []
+
             print(f'ite_method: {ite_method}, cf_method: {cf_method}')
             print('conformalizing for ITE intervals...')
+            
             for j in tqdm(range(self.n_folds)):
                 X_calib_inter_0 = self.X_calib_inter_list[j][self.T_calib_inter_list[j]==0, :]
                 Y_calib_inter_0 = self.Y_calib_inter_list[j][self.T_calib_inter_list[j]==0]
@@ -824,7 +854,9 @@ class SplitCP(BaseCP):
 
         elif cf_method in ['inexact', 'exact']:
                             
-            self.offset_list = []
+            self.offset_u_list = []
+            self.offset_l_list = []
+
             print(f'ite_method: {ite_method}, cf_method: {cf_method}')
             print('conformalizing for ITE intervals...')
             for j in tqdm(range(self.n_folds)):
@@ -846,11 +878,13 @@ class SplitCP(BaseCP):
                                                     i, j, alpha, 
                                                     ite_method=ite_method,
                                                     cf_method=cf_method, dr_use_Y=dr_use_Y)
-                    
+                
                 pause = True
             
             if ite_method == "exact":
-                self.offset_list = np.array(self.offset_list).reshape(self.n_folds,self.n_folds)
+                self.offset_l_list = np.array(self.offset_l_list).reshape(self.n_folds,self.n_folds)
+                self.offset_u_list = np.array(self.offset_u_list).reshape(self.n_folds,self.n_folds)
+
                 
         else:
             raise ValueError('method must be one of naive, nested_inexact, nested_exact')
@@ -887,8 +921,9 @@ class SplitCP(BaseCP):
                 CI_ITE_u = self.tilde_C_ITE_model_u[i].predict(X_test)
                 
                 if ite_method == 'exact':
-                    CI_ITE_l -= self.offset_list[i]
-                    CI_ITE_u += self.offset_list[i]
+                    #TODO: this seems not correct, the offset should use weights for the test
+                    CI_ITE_l -= self.offset_l_list[i]
+                    CI_ITE_u += self.offset_u_list[i]
 
                 CI_ITE_l_list.append(CI_ITE_l)
                 CI_ITE_u_list.append(CI_ITE_u)
@@ -914,8 +949,8 @@ class SplitCP(BaseCP):
                     CI_ITE_u = self.tilde_C_ITE_model_u[j][i].predict(X_test)
                     
                     if ite_method == 'exact':
-                        CI_ITE_l -= self.offset_list[j][i]
-                        CI_ITE_u += self.offset_list[j][i]
+                        CI_ITE_l -= self.offset_l_list[j][i]
+                        CI_ITE_u += self.offset_u_list[j][i]
 
                     CI_ITE_l_list.append(CI_ITE_l)
                     CI_ITE_u_list.append(CI_ITE_u)

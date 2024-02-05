@@ -13,7 +13,7 @@ def get_config():
 
     # Data settings
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--save_path', type=str, default='./results')
+    parser.add_argument('--save_path', type=str, default='./debug_results')
     parser.add_argument('--debug', type=bool, default=True)
     parser.add_argument('--dataset', type=str, default='cevae')
 
@@ -191,7 +191,7 @@ def main(args):
         if 'TCP' == args.method:
             res = run_conformal(df_o,
                                 df_i,
-                                quantile_regression=args.quantile_regression, # QR not implemented yet
+                                quantile_regression=args.quantile_regression,
                                 n_folds=n_folds,
                                 alpha=alpha,
                                 test_frac=test_frac,
