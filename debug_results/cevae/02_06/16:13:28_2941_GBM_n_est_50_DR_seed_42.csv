@@ -1,0 +1,2 @@
+,method,coverage_0,coverage_1,interval_width_0,interval_width_1,coverage_ITE (naive),interval_width (naive),n_intervention,n_observation,conf_strength,dr_use_Y,seed,x_dim
+0,naive,0.9295,0.9535,0.4255730494413697,0.44329545672002846,0.9935,0.8688685061613982,100,10000,0.6,0,42,5

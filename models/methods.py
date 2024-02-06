@@ -180,6 +180,7 @@ def weighted_conformal_prediction(df_o, quantile_regression, alpha, test_frac, t
 def run_conformal(df_o, df_i, 
                   quantile_regression, 
                   n_folds : int, alpha : float, test_frac : float, target : str, method : str,
+                  ite_method : str,
                   density_ratio_model : str = "MLP",
                   base_learner : str = "RF",
                   n_estimators:int = 10,
@@ -225,8 +226,7 @@ def run_conformal(df_o, df_i,
     Y0, Y1 = test_data[['Y0']].values.reshape((-1,)), test_data[['Y1']].values.reshape((-1,))
     ITE_test = Y1 - Y0
 
-    print("working on potential outcomes...")
-    # if target == 'counterfactual':
+    print(f'cf_method = {method}')
     if method == 'naive':
         model = SplitCP(data_obs=train_data,
                     data_inter=df_i,
@@ -236,6 +236,10 @@ def run_conformal(df_o, df_i,
                     quantile_regression=quantile_regression)
         
         C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_naive(alpha, X_test, Y0, Y1)
+        
+        _, _, C1_l_calib, C1_u_calib = model.predict_counterfactual_naive(alpha, X_calib_inter_0, Y0, Y1)
+        C0_l_calib, C0_u_calib, _, _ = model.predict_counterfactual_naive(alpha, X_calib_inter_1, Y0, Y1)
+
         coverage_0, coverage_1, interval_width_0, interval_width_1 = eval_po(Y1,Y0,C0_l,C0_u,C1_l,C1_u)
 
         if plot:
@@ -264,7 +268,18 @@ def run_conformal(df_o, df_i,
                     base_learner="RF", 
                     quantile_regression=quantile_regression) 
         
-        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_inexact(alpha, X_test, Y0, Y1, dr_use_Y=dr_use_Y)
+        C0_l_model, C0_u_model, C1_l_model, C1_u_model = model.predict_counterfactual_inexact(alpha, X_test, Y0, Y1, dr_use_Y=dr_use_Y)
+        C0_l, C0_u, C1_l, C1_u = C0_l_model.predict(X_test), C0_u_model.predict(X_test), C1_l_model.predict(X_test), C1_u_model.predict(X_test)
+
+        # This is for ite evaluation
+        X_calib_inter_0 = df_i[df_i['T']==0].filter(like = 'X').values
+        Y_calib_inter_0 = df_i[df_i['T']==0]['Y'].values
+        X_calib_inter_1 = df_i[df_i['T']==1].filter(like = 'X').values
+        Y_calib_inter_1 = df_i[df_i['T']==1]['Y'].values
+
+        C1_l_calib, C1_u_calib = C1_l_model.predict(X_calib_inter_0), C1_u_model.predict(X_calib_inter_0)
+        C0_l_calib, C0_u_calib = C0_l_model.predict(X_calib_inter_1), C0_u_model.predict(X_calib_inter_1)
+
         coverage_0, coverage_1, interval_width_0, interval_width_1 = eval_po(Y1,Y0,C0_l,C0_u,C1_l,C1_u)
 
     
@@ -276,11 +291,22 @@ def run_conformal(df_o, df_i,
             base_learner="RF", 
             quantile_regression=quantile_regression)
         
-        C0_l, C0_u, C1_l, C1_u = model.predict_counterfactual_exact(alpha / 2, X_test, Y0, Y1, dr_use_Y=dr_use_Y)
+        C0_l_model, C0_u_model, C1_l_model, C1_u_model  = model.predict_counterfactual_exact(alpha / 2, X_test, Y0, Y1, dr_use_Y=dr_use_Y)
+        C0_l, C0_u, C1_l, C1_u = C0_l_model.predict(X_test), C0_u_model.predict(X_test), C1_l_model.predict(X_test), C1_u_model.predict(X_test)
+        
+        # This is for ite
+        X_calib_inter_0 = df_i[df_i['T']==0].filter(like = 'X').values
+        Y_calib_inter_0 = df_i[df_i['T']==0]['Y'].values
+        X_calib_inter_1 = df_i[df_i['T']==1].filter(like = 'X').values
+        Y_calib_inter_1 = df_i[df_i['T']==1]['Y'].values
+
+        C1_l_calib, C1_u_calib = C1_l_model.predict(X_calib_inter_0), C1_u_model.predict(X_calib_inter_0)
+        C0_l_calib, C0_u_calib = C0_l_model.predict(X_calib_inter_1), C0_u_model.predict(X_calib_inter_1)
+
         coverage_0, coverage_1, interval_width_0, interval_width_1 = eval_po(Y1,Y0,C0_l,C0_u,C1_l,C1_u)
 
     
-    elif method == 'TCP':
+    elif method == 'tcp':
         model = TCP(data_obs=train_data,
             data_inter=df_i,
             n_folds=n_folds,
@@ -294,6 +320,11 @@ def run_conformal(df_o, df_i,
         # alpha
         C0_l, C0_u = model.predict_counterfactual(X_test, 0, Y0, Y1)
         C1_l, C1_u = model.predict_counterfactual(X_test, 1, Y0, Y1)
+
+        # This is for ite
+        C1_l_calib, C1_u_calib = model.predict_counterfactual(X_calib_inter_0, 1, Y0, Y1)
+        C0_l_calib, C0_u_calib = model.predict_counterfactual(X_calib_inter_1, 0, Y0, Y1)
+
         coverage_0, coverage_1, interval_width_0, interval_width_1 = eval_po(Y1,Y0,C0_l,C0_u,C1_l,C1_u)
 
     res = {}
@@ -304,68 +335,71 @@ def run_conformal(df_o, df_i,
     res['interval_width_1'] = interval_width_1
 
     # we consider all 3 ite evaluation methods
-    
-    # ite_method = naive
-    print('ite_method = naive...')
-    model.conformalize(alpha, ite_method='naive', cf_method=method, dr_use_Y=dr_use_Y)
+    print(f'ite_method = {ite_method}')
 
-    C0 = [C0_l, C0_u]
-    C1 = [C1_l, C1_u]
-    
-    CI_ITE_l, CI_ITE_u = model.predict_ITE(alpha, X_test, C0, C1, 
-                    ite_method='naive', 
-                    cf_method=method)
-    
-    coverage_ITE = np.mean((ITE_test >= CI_ITE_l) & (ITE_test <= CI_ITE_u))
-    interval_width_ITE = np.mean(np.abs(CI_ITE_u - CI_ITE_l))
-    print('Coverage of ITE (naive)', coverage_ITE)
-    print('Interval width of ITE (naive)', interval_width_ITE)
+    if ite_method == 'naive':
+        CI_ITE_l = C1_l - C0_u
+        CI_ITE_u = C1_u - C0_l
 
-    res['coverage_ITE_naive'] = coverage_ITE
-    res['interval_width_ITE_naive'] = interval_width_ITE
-
-    if method != 'TCP':
-        # elif target == 'nested_inexact':
-        print('ite_method = inexact...')
-        model.reset_tilde_C_ITE_models(cf_method=method)
-        model.conformalize(alpha, 
-                        ite_method='inexact', 
-                        cf_method=method, dr_use_Y=dr_use_Y)
-        CI_ITE_l, CI_ITE_u = model.predict_ITE(alpha, X_test, C0, C1, 
-                        ite_method='inexact', 
-                        cf_method=method)
         coverage_ITE = np.mean((ITE_test >= CI_ITE_l) & (ITE_test <= CI_ITE_u))
         interval_width_ITE = np.mean(np.abs(CI_ITE_u - CI_ITE_l))
-        print('Coverage of ITE (nested inexact)', coverage_ITE)
-        print('Interval width of ITE (nested inexact)', interval_width_ITE)
+        print('Coverage of ITE (naive)', coverage_ITE)
+        print('Interval width of ITE (naive)', interval_width_ITE)
 
-        res['coverage_ITE_inexact'] = coverage_ITE
-        res['interval_width_ITE_inexact'] = interval_width_ITE
-        
-        # elif target == 'nested_exact':
-        print('ite_method = exact...')
+        res['coverage_ITE (naive)'] = coverage_ITE
+        res['interval_width (naive)'] = interval_width_ITE
 
-        model.reset_tilde_C_ITE_models(cf_method=method)
-        model.conformalize(alpha / 2, 
-                        ite_method='exact', 
-                        cf_method=method, dr_use_Y=dr_use_Y)
-        CI_ITE_l, CI_ITE_u = model.predict_ITE(alpha / 2, X_test, C0, C1,
-                                                ite_method='exact', cf_method=method)
+    elif ite_method == 'inexact':
+        ITE_l_model = GradientBoostingRegressor()
+        ITE_u_model = GradientBoostingRegressor()
+
+        ite_calib_u =  np.concatenate(((C1_u_calib - Y_calib_inter_0), (Y_calib_inter_1 - C0_l_calib)), axis=0)
+        ite_calib_l =  np.concatenate(((C1_l_calib - Y_calib_inter_0), (Y_calib_inter_1 - C0_u_calib)), axis=0)
+        X_calib = np.concatenate((X_calib_inter_0, X_calib_inter_1), axis=0)
+        ITE_l_model.fit(X_calib, ite_calib_l)
+        ITE_u_model.fit(X_calib, ite_calib_u)
+
+        CI_ITE_l = ITE_l_model.predict(X_test)
+        CI_ITE_u = ITE_u_model.predict(X_test)
+    
         coverage_ITE = np.mean((ITE_test >= CI_ITE_l) & (ITE_test <= CI_ITE_u))
         interval_width_ITE = np.mean(np.abs(CI_ITE_u - CI_ITE_l))
-        print('Coverage of ITE (nested exact)', coverage_ITE)
-        print('Interval width of ITE (nested exact)', interval_width_ITE)
-        
-        res['coverage_ITE_exact'] = coverage_ITE
-        res['interval_width_ITE_exact'] = interval_width_ITE
-        
-    else:
-        res['coverage_ITE_inexact'] = 0.0
-        res['interval_width_ITE_inexact'] = 0.0
-        res['coverage_ITE_exact'] = 0.0
-        res['interval_width_ITE_exact'] = 0.0
+        print('Coverage of ITE (inexact)', coverage_ITE)
+        print('Interval width of ITE (inexact)', interval_width_ITE)
 
-    pause = True
+        res['coverage_ITE (inexact)'] = coverage_ITE
+        res['interval_width (inexact)'] = interval_width_ITE
 
+    elif ite_method == 'exact':
+        ITE_l_model = GradientBoostingRegressor()
+        ITE_u_model = GradientBoostingRegressor()
+
+        ite_calib_u =  np.concatenate(((C1_u_calib - Y_calib_inter_0), (Y_calib_inter_1 - C0_l_calib)), axis=0)
+        ite_calib_l =  np.concatenate(((C1_l_calib - Y_calib_inter_0), (Y_calib_inter_1 - C0_u_calib)), axis=0)
+        X_calib = np.concatenate((X_calib_inter_0, X_calib_inter_1), axis=0)
+        Y_calib = np.concatenate((Y_calib_inter_0, Y_calib_inter_1), axis=0)
+
+        X_calib_train, X_calib_calib = train_test_split(X_calib, test_size=0.25, random_state=42)
+        ite_calib_l_train, ite_calib_l_calib = train_test_split(ite_calib_l, test_size=0.25, random_state=42)
+        ite_calib_u_train, ite_calib_u_calib = train_test_split(ite_calib_u, test_size=0.25, random_state=42)
+
+        ITE_l_model.fit(X_calib_train, ite_calib_l_train)
+        ITE_u_model.fit(X_calib_train, ite_calib_u_train)
+
+        scores_l = np.abs(ITE_l_model.predict(X_calib_calib) - ite_calib_l_calib)
+        offset_l = utils.standard_conformal(alpha, scores_l)
+        scores_u = np.abs(ITE_u_model.predict(X_calib_calib) - ite_calib_u_calib)
+        offset_u = utils.standard_conformal(alpha, scores_u)
+
+        CI_ITE_l = ITE_l_model.predict(X_test) - offset_l
+        CI_ITE_u = ITE_u_model.predict(X_test) + offset_u
+
+        coverage_ITE = np.mean((ITE_test >= CI_ITE_l) & (ITE_test <= CI_ITE_u))
+        interval_width_ITE = np.mean(np.abs(CI_ITE_u - CI_ITE_l))
+        print('Coverage of ITE (exact)', coverage_ITE)
+        print('Interval width of ITE (exact)', interval_width_ITE)
+
+        res['coverage_ITE (exact)'] = coverage_ITE
+        res['interval_width (exact)'] = interval_width_ITE
     return res
     

@@ -31,12 +31,13 @@ def get_config():
     # parser.add_argument('--output_folder', type=str, default=None) # keep it as None for local exp
 
     # Model settings
-    parser.add_argument('--method', type=str, default='inexact')
+    parser.add_argument('--cf_method', type=str, default='inexact')
+    parser.add_argument('--ite_method', type=str, default='exact')
 
     parser.add_argument('--dr_use_Y', type=int, default=0, help="0: not use Y, 1: use Y, 2: use pseudo label")
 
     parser.add_argument('--base_learner', type=str, default="GBM")
-    parser.add_argument('--density_ratio_model', type=str, default="DR")
+    parser.add_argument('--density_ratio_model', type=str, default="MLP")
     parser.add_argument('--n_estimators', type=int, default=50)
     parser.add_argument('--quantile_regression', type=bool, default=True, 
                         help="True for quantile regression, now only supports quantile regression")
@@ -64,7 +65,8 @@ def main(args):
     np.random.seed(args.seed)
 
     n_observation = args.n_obs
-    n_intervention_list = [100, 500, 1000, 5000]
+    # n_intervention_list = [100, 500, 1000, 5000]
+    n_intervention_list = [100]
     # n_intervention_list = np.arange(args.n_inter_min, args.n_inter_max, args.n_inter_gap)
 
     print(n_intervention_list)
@@ -135,7 +137,7 @@ def main(args):
                        n_obs_treated, n_obs_controlled, n_inter_treated, n_inter_controlled)
         
         # naive baseline
-        if 'naive' == args.method:
+        if 'naive' == args.cf_method:
             res = run_conformal(df_o,
                                 df_i,
                                 quantile_regression=True,
@@ -144,12 +146,13 @@ def main(args):
                                 test_frac=test_frac, #controls test
                                 target="counterfactual",
                                 method = 'naive',
+                                ite_method=args.ite_method,
                                 plot=args.plot_dist,
                                 dataset=args.dataset)
             
             utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
 
-        if 'inexact' == args.method:
+        if 'inexact' == args.cf_method:
             res = run_conformal(
                                 df_o,
                                 df_i,
@@ -159,11 +162,12 @@ def main(args):
                                 test_frac=test_frac,
                                 target="counterfactual",
                                 method = 'inexact',
+                                ite_method=args.ite_method,
                                 dr_use_Y=dr_use_Y)
             
             utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
 
-        if 'exact' == args.method:
+        if 'exact' == args.cf_method:
 
             res = run_conformal(
                                 df_o,
@@ -174,21 +178,23 @@ def main(args):
                                 test_frac=test_frac,
                                 target="counterfactual",
                                 method = 'exact',
+                                ite_method=args.ite_method,
                                 dr_use_Y=dr_use_Y)
             
             utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
 
-        if 'wcp' == args.method:
+        if 'wcp' == args.cf_method:
             res = weighted_conformal_prediction(df_o, 
                                             quantile_regression=True, 
                                             alpha=alpha, 
                                             test_frac=test_frac,
                                             target="counterfactual",
-                                            method='wcp')
+                                            method='wcp',
+                                            ite_method='inexact')
             
             utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
 
-        if 'TCP' == args.method:
+        if 'tcp' == args.cf_method:
             res = run_conformal(df_o,
                                 df_i,
                                 quantile_regression=args.quantile_regression,
@@ -196,7 +202,8 @@ def main(args):
                                 alpha=alpha,
                                 test_frac=test_frac,
                                 target="counterfactual",
-                                method = 'TCP',
+                                method = 'tcp',
+                                ite_method=args.ite_method,
                                 density_ratio_model=args.density_ratio_model,
                                 base_learner=args.base_learner,
                                 n_estimators=args.n_estimators,
