@@ -39,6 +39,6 @@ do
     --seed $seed \
     --n_estimator $n_estimator \
     --n_folds $n_folds \
-    --save_path "./results" \
+    --save_path "/opt/tiger/causal_TCP/results" \
     --test_frac $test_frac
 done
