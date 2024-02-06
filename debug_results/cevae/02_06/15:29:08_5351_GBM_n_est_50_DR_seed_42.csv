@@ -1,3 +1,0 @@
-,method,coverage_0,coverage_1,interval_width_0,interval_width_1,n_intervention,n_observation,conf_strength,dr_use_Y,seed,x_dim
-0,inexact,0.923,0.931,0.36904934158575886,0.3712924481308593,100,10000,0.6,0,42,5
-0,inexact,0.931,0.9265,0.3688841290830588,0.36739083932498046,500,10000,0.6,0,42,5

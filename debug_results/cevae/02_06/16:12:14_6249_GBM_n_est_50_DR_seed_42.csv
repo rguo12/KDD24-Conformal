@@ -1,2 +1,0 @@
-,method,coverage_0,coverage_1,interval_width_0,interval_width_1,coverage_ITE (inexact),interval_width (inexact),n_intervention,n_observation,conf_strength,dr_use_Y,seed,x_dim
-0,inexact,0.923,0.931,0.36904934158575886,0.3712924481308593,0.77,0.36632180295873745,100,10000,0.6,0,42,5
