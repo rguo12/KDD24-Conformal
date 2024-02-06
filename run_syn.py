@@ -24,15 +24,12 @@ def get_config():
 
     # ihdp hidden conf strength
     parser.add_argument('--HC', type=bool, default=True, help="if False, X=U, for debug")
-
-    parser.add_argument('--conf_strength', type=float, default=0.6, help="randomzied treatment when = 0.5")
+    parser.add_argument('--conf_strength', type=float, default=0.8, help="randomzied treatment when = 0.5")
     parser.add_argument('--x_dim', type=int, default=5)
 
-    # parser.add_argument('--output_folder', type=str, default=None) # keep it as None for local exp
-
     # Model settings
-    parser.add_argument('--cf_method', type=str, default='inexact')
-    parser.add_argument('--ite_method', type=str, default='exact')
+    parser.add_argument('--cf_method', type=str, default='tcp')
+    # parser.add_argument('--ite_method', type=str, default='naive')
 
     parser.add_argument('--dr_use_Y', type=int, default=0, help="0: not use Y, 1: use Y, 2: use pseudo label")
 
@@ -44,9 +41,6 @@ def get_config():
     
     parser.add_argument('--plot_dist', type=bool, default=False, 
                         help="True for plotting P(X,Y) for calib and test")
-    
-    # TCP
-    # parser.add_argument('--n_Y_bins', type=int, default=10)
 
     args = parser.parse_args()
 
@@ -55,7 +49,7 @@ def get_config():
 def main(args):
     # Get the current time
     current_time = datetime.now()
-    cur_date = current_time.strftime("%m_%d")
+    cur_date = current_time.strftime("%m-%d")
     cur_time = current_time.strftime("%H:%M:%S")
     
     # Generating a 4 digit random integer to avoid fn collision
@@ -65,9 +59,7 @@ def main(args):
     np.random.seed(args.seed)
 
     n_observation = args.n_obs
-    # n_intervention_list = [100, 500, 1000, 5000]
-    n_intervention_list = [100]
-    # n_intervention_list = np.arange(args.n_inter_min, args.n_inter_max, args.n_inter_gap)
+    n_intervention_list = [100, 250, 500, 750, 1000]
 
     print(n_intervention_list)
 
@@ -78,28 +70,7 @@ def main(args):
 
     dr_use_Y = args.dr_use_Y
 
-    # if args.dr_use_Y > 0:
-    #     dr_use_Y = True
-    # else:
-    #     dr_use_Y = False
-        
-    # df_train, df_test = generate_lilei_hua_data()
-    # _ = weighted_conformal_prediction([df_train, df_test], 
-    #                                   metalearner="DR", 
-    #                                   quantile_regression=True, 
-    #                                   alpha=0.1, 
-    #                                   test_frac=0.1)
-    # df_o = [df_train, df_test]
-
     for n_intervention in n_intervention_list:
-        # n_intervention = args.n_intervention
-        # if args.dataset == 'synthetic':
-        #     df_o, df_i = generate_data(n_observation=n_observation,    
-        #                         n_intervention=n_intervention,
-        #                         d=d, 
-        #                         gamma=args.conf_strength, 
-        #                         alpha=alpha,
-        #                         confounding=True)
             
         if args.dataset == 'cevae':
             df_o, df_i = generate_cevae_data(n_observation, n_intervention, 
@@ -107,10 +78,6 @@ def main(args):
                                             d=args.x_dim, 
                                             err_scale=err_scale,
                                             hidden_conf=args.HC)
-
-        # elif args.dataset == 'ours':
-        #     df_o, df_i = generate_our_data(n_observation, n_intervention, err_scale = err_scale)
-
         elif args.dataset == 'ihdp':
             # as ihdp is a small dataset w. 740+ samples
             # we only allow the n_intervention to be no larger than 500
@@ -138,7 +105,7 @@ def main(args):
         
         # naive baseline
         if 'naive' == args.cf_method:
-            res = run_conformal(df_o,
+            res_list = run_conformal(df_o,
                                 df_i,
                                 quantile_regression=True,
                                 n_folds=n_folds, #controls calib
@@ -146,14 +113,14 @@ def main(args):
                                 test_frac=test_frac, #controls test
                                 target="counterfactual",
                                 cf_method = 'naive',
-                                ite_method=args.ite_method,
+                                # ite_method=args.ite_method,
                                 plot=args.plot_dist,
                                 dataset=args.dataset)
-            
-            utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
+            for res in res_list:
+                utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
 
         if 'inexact' == args.cf_method:
-            res = run_conformal(
+            res_list = run_conformal(
                                 df_o,
                                 df_i,
                                 quantile_regression=True,
@@ -162,14 +129,15 @@ def main(args):
                                 test_frac=test_frac,
                                 target="counterfactual",
                                 cf_method = 'inexact',
-                                ite_method=args.ite_method,
+                                # ite_method=args.ite_method,
                                 dr_use_Y=dr_use_Y)
             
-            utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
+            for res in res_list:
+                utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
 
         if 'exact' == args.cf_method:
 
-            res = run_conformal(
+            res_list = run_conformal(
                                 df_o,
                                 df_i,
                                 quantile_regression=True,
@@ -178,24 +146,26 @@ def main(args):
                                 test_frac=test_frac,
                                 target="counterfactual",
                                 cf_method = 'exact',
-                                ite_method=args.ite_method,
+                                # ite_method=args.ite_method,
                                 dr_use_Y=dr_use_Y)
             
-            utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
+            for res in res_list:
+                utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
 
         if 'wcp' == args.cf_method:
-            res = weighted_conformal_prediction(df_o, 
+            res_list = weighted_conformal_prediction(df_o, 
                                             quantile_regression=True, 
                                             alpha=alpha, 
                                             test_frac=test_frac,
                                             target="counterfactual",
-                                            ite_method=args.ite_method,
+                                            # ite_method=args.ite_method,
                                             )
             
-            utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
+            for res in res_list:
+                utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
 
         if 'tcp' == args.cf_method:
-            res = run_conformal(df_o,
+            res_list = run_conformal(df_o,
                                 df_i,
                                 quantile_regression=args.quantile_regression,
                                 n_folds=n_folds,
@@ -203,18 +173,15 @@ def main(args):
                                 test_frac=test_frac,
                                 target="counterfactual",
                                 cf_method = 'tcp',
-                                ite_method=args.ite_method,
+                                # ite_method=args.ite_method,
                                 density_ratio_model=args.density_ratio_model,
                                 base_learner=args.base_learner,
                                 n_estimators=args.n_estimators,
                                 dr_use_Y=dr_use_Y)
             
-            utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
+            for res in res_list:
+                utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
 
-            # coverage, average_interval_width, PEHE, conformity_scores = conformal_metalearner(df_o, 
-            #                                                                                 metalearner="DR", 
-            #                                                                                 quantile_regression=True, 
-            #                                                                                 alpha=0.1, 
             
         print(f"n_obs_treated: {n_obs_treated}, n_obs_controlled: {n_obs_controlled}, n_inter_treated: {n_inter_treated}, n_inter_controlled: {n_inter_controlled}")
     

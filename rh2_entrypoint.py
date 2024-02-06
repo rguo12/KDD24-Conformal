@@ -24,13 +24,18 @@ env = get_rh2_env()
 dataset = env.params.dataset
 output_folder = env.params.output_folder
 
-n_inter_max = env.params.n_inter_max
-n_obs = env.params.n_obs
-# beta_u = env.params.beta_u
+x_dim = env.params.x_dim
+conf_strength = env.params.conf_strength
 n_estimators= env.params.n_estimators
-base_learner = env.params.base_learner
-density_ratio_model = env.params.density_ratio_model
-quantile_regression = env.params.quantile_regression
+methods_str = "tcp" # only run tcp on arnold
+
+# n_inter_max = env.params.n_inter_max
+# n_obs = env.params.n_obs
+# # beta_u = env.params.beta_u
+# base_learner = env.params.base_learner
+# density_ratio_model = env.params.density_ratio_model
+# quantile_regression = env.params.quantile_regression
+
 
 # seed = env.params.seed
 # n_Y_bins = env.params.n_Y_bins
@@ -50,18 +55,9 @@ print(f"output folder is {output_folder}")
 # train code
 
 # cmd = f'''python3 run_syn.py --dataset={dataset} --save_path={local_save_path}'''
-for seed in range(42,47):
-    cmd = f'''python3 run_syn.py --dataset={dataset} \
-            --save_path={local_save_path} \
-            --n_inter_max={n_inter_max} \
-            --n_obs={n_obs} \
-            --n_estimators={n_estimators} \
-            --base_learner={base_learner} \
-            --density_ratio_model={density_ratio_model} \
-            --quantile_regression={quantile_regression} \
-            --seed={seed} \
+for seed in range(1234,1239):
+    cmd = f'''bash run_syn.sh {x_dim} {conf_strength} {n_estimators} {methods_str}
             '''
-
     print(f'cmd: {cmd}')
     exit_code = subprocess.call(cmd, shell=True)
 

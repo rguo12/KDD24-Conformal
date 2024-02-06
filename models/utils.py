@@ -175,13 +175,17 @@ def get_dr_data(X_obs_0, Y_obs_0, X_inter_0, Y_inter_0, dr_use_Y, pseudo_label_m
                         
 
 def save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number):
+    
     res['n_intervention'] = n_intervention
     res['n_observation'] = n_observation
+
     res['conf_strength'] = args.conf_strength
     res['dr_use_Y'] = args.dr_use_Y
-    res['seed'] = args.seed
 
     res['x_dim'] = args.x_dim
+    res['dr_model'] = args.density_ratio_model
+
+    res['seed'] = args.seed
 
     df = pd.DataFrame.from_dict(res, orient="index").transpose()
     

@@ -17,6 +17,8 @@ commands
 *.npy
 iDCF/figs
 
+*.csv
+
 wandb/
 data/IHDP
 .vscode/

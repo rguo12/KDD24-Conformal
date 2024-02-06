@@ -1135,8 +1135,13 @@ class TCP(BaseCP):
                 scores = np.maximum(Y_hat_l - Y_aug, Y_aug - Y_hat_u)
 
                 D_test = np.concatenate((x_test, np.array([y])[:, None]), axis=1)
-                p_obs = density_model.predict_proba(D_test)[:,1]
-                weight_test = (1. - p_obs) / p_obs #TODO: double check
+
+                if self.density_ratio_model == "MLP":
+                    p_obs = density_model.predict_proba(D_test)[:,1]
+                    weight_test = (1. - p_obs) / p_obs #TODO: double check
+                elif self.density_ratio_model == "DR":
+                    weight_test = density_model.compute_density_ratio(D_test)
+
                 offset = utils.weighted_transductive_conformal(
                     self.alpha, weights_train, weight_test, scores)
                 return offset, scores[-1]
