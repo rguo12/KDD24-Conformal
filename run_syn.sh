@@ -1,7 +1,7 @@
 dataset="cevae"
 
 n_folds=2
-test_frac=0.2
+test_frac=0.02
 
 # vars to modify
 # methods=("wcp")

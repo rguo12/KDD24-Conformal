@@ -18,7 +18,7 @@ def get_config():
     parser.add_argument('--dataset', type=str, default='cevae')
 
     parser.add_argument('--n_folds', type=int, default=2)
-    parser.add_argument('--test_frac', type=float, default=0.2)
+    parser.add_argument('--test_frac', type=float, default=0.02)
 
     parser.add_argument('--n_obs', type=int, default=10000)
 
