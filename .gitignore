@@ -19,6 +19,7 @@ iDCF/figs
 
 *.csv
 !run_syn.sh
+!run_tcp.sh
 
 wandb/
 data/IHDP

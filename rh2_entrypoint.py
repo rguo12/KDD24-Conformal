@@ -27,7 +27,7 @@ output_folder = env.params.output_folder
 x_dim = env.params.x_dim
 conf_strength = env.params.conf_strength
 n_estimators= env.params.n_estimators
-methods_str = "tcp" # only run tcp on arnold
+seed = env.params.seed # only run tcp on arnold
 
 # n_inter_max = env.params.n_inter_max
 # n_obs = env.params.n_obs
@@ -55,11 +55,10 @@ print(f"output folder is {output_folder}")
 # train code
 
 # cmd = f'''python3 run_syn.py --dataset={dataset} --save_path={local_save_path}'''
-for seed in range(1234,1239):
-    cmd = f'''bash run_syn.sh {x_dim} {conf_strength} {n_estimators} {methods_str}
-            '''
-    print(f'cmd: {cmd}')
-    exit_code = subprocess.call(cmd, shell=True)
+# for seed in range(1234,1239):
+cmd = f'''bash run_tcp.sh {x_dim} {conf_strength} {n_estimators} {seed}'''
+print(f'cmd: {cmd}')
+exit_code = subprocess.call(cmd, shell=True)
 
 # copy generated model back to rh2
 if exit_code == 0:
