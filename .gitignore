@@ -18,6 +18,7 @@ commands
 iDCF/figs
 
 *.csv
+!run_syn.sh
 
 wandb/
 data/IHDP
