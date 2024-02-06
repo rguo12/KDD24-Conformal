@@ -1100,7 +1100,7 @@ class TCP(BaseCP):
 
         return density_model, weights_train
 
-    def predict_counterfactual(self, X_test, T, Y0, Y1):
+    def predict_counterfactual(self, X_test, T):
         # Fit regression models for T=1 or T=0 on obs + inter data (x_1,y_1,...,x_M+1,y) for all y \in \mathcal{Y}
 
         n_test = X_test.shape[0]

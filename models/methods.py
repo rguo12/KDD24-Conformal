@@ -282,20 +282,29 @@ def run_conformal(df_o, df_i,
             K=K)
         
         # alpha
-        C0_l, C0_u = model.predict_counterfactual(X_test, 0, Y0, Y1)
-        C1_l, C1_u = model.predict_counterfactual(X_test, 1, Y0, Y1)
+        C0_l, C0_u = model.predict_counterfactual(X_test, 0)
+        C1_l, C1_u = model.predict_counterfactual(X_test, 1)
 
         # This is for ite
-        C1_l_calib, C1_u_calib = model.predict_counterfactual(X_calib_inter_0, 1, Y0, Y1)
-        C0_l_calib, C0_u_calib = model.predict_counterfactual(X_calib_inter_1, 0, Y0, Y1)
+        # for tcp ite
+
+        # C1_l_calib, C1_u_calib = model.predict_counterfactual(X_calib_inter_0, 1)
+        # C0_l_calib, C0_u_calib = model.predict_counterfactual(X_calib_inter_1, 0)
+
+        C1_l_calib, C1_u_calib = None, None
+        C0_l_calib, C0_u_calib = None, None
 
         coverage_0, coverage_1, interval_width_0, interval_width_1 = eval_po(Y1,Y0,C0_l,C0_u,C1_l,C1_u)
 
     # we consider all 3 ite evaluation methods
     res_list = []
-    for ite_method in ["naive", "inexact", "exact"]:
-        print(f'ite_method = {ite_method}')
+    if cf_method != "tcp":
+        ite_methods = ["naive", "inexact", "exact"]
+    else:
+        ite_methods = ["naive"]
 
+    for ite_method in ite_methods:
+        print(f'ite_method = {ite_method}')
         res = {}
         res['cf_method'] = cf_method
         res['ite_method'] = ite_method
@@ -304,7 +313,8 @@ def run_conformal(df_o, df_i,
         res['interval_width_0'] = interval_width_0
         res['interval_width_1'] = interval_width_1
 
-        CI_ITE_l, CI_ITE_u = predict_ITE(alpha, X_test, C0_l, C0_u, C1_l, C1_u, X_calib_inter_0, X_calib_inter_1,   
+        CI_ITE_l, CI_ITE_u = predict_ITE(alpha, X_test, C0_l, C0_u, C1_l, C1_u, 
+                                         X_calib_inter_0, X_calib_inter_1,   
                                         C0_l_calib, C0_u_calib, C1_l_calib, C1_u_calib, 
                                         Y_calib_inter_0, Y_calib_inter_1, ite_method)
         
@@ -321,7 +331,8 @@ def run_conformal(df_o, df_i,
     return res_list
     
 
-def predict_ITE(alpha, X_test, C0_l, C0_u, C1_l, C1_u, X_calib_inter_0, X_calib_inter_1, 
+def predict_ITE(alpha, X_test, C0_l, C0_u, C1_l, C1_u, 
+                X_calib_inter_0, X_calib_inter_1, 
                 C0_l_calib, C0_u_calib, C1_l_calib, C1_u_calib,
                 Y_calib_inter_0, Y_calib_inter_1,
                 ite_method):
