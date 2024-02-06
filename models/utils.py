@@ -202,7 +202,7 @@ def save_results(args, res, n_intervention, n_observation, cur_date, cur_time, r
         df.to_csv(fn, mode='a', header=False)
     
     if args.debug:
-        print(f"Conformal prediction ({res['method']})")
+        print(f"Conformal prediction ({res['cf_method']})")
         print("Number of intervention data", n_intervention)
         print("Number of observation data", n_observation)
         print('Coverage of Y(0)', res['coverage_0'])

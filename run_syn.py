@@ -145,7 +145,7 @@ def main(args):
                                 alpha=alpha,
                                 test_frac=test_frac, #controls test
                                 target="counterfactual",
-                                method = 'naive',
+                                cf_method = 'naive',
                                 ite_method=args.ite_method,
                                 plot=args.plot_dist,
                                 dataset=args.dataset)
@@ -161,7 +161,7 @@ def main(args):
                                 alpha=alpha,
                                 test_frac=test_frac,
                                 target="counterfactual",
-                                method = 'inexact',
+                                cf_method = 'inexact',
                                 ite_method=args.ite_method,
                                 dr_use_Y=dr_use_Y)
             
@@ -177,7 +177,7 @@ def main(args):
                                 alpha=alpha,
                                 test_frac=test_frac,
                                 target="counterfactual",
-                                method = 'exact',
+                                cf_method = 'exact',
                                 ite_method=args.ite_method,
                                 dr_use_Y=dr_use_Y)
             
@@ -189,8 +189,8 @@ def main(args):
                                             alpha=alpha, 
                                             test_frac=test_frac,
                                             target="counterfactual",
-                                            method='wcp',
-                                            ite_method='inexact')
+                                            ite_method=args.ite_method,
+                                            )
             
             utils.save_results(args, res, n_intervention, n_observation, cur_date, cur_time, random_number)
 
@@ -202,7 +202,7 @@ def main(args):
                                 alpha=alpha,
                                 test_frac=test_frac,
                                 target="counterfactual",
-                                method = 'tcp',
+                                cf_method = 'tcp',
                                 ite_method=args.ite_method,
                                 density_ratio_model=args.density_ratio_model,
                                 base_learner=args.base_learner,

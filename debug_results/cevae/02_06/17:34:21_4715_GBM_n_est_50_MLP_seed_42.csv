@@ -1,0 +1,2 @@
+,cf_method,ite_method,coverage_0,coverage_1,interval_width_0,interval_width_1,coverage_ITE,interval_width,n_intervention,n_observation,conf_strength,dr_use_Y,seed,x_dim
+0,WCP,naive,0.8565,0.869,0.31763916461592356,0.32498760466678345,0.9755,0.6426267692827071,100,10000,0.6,0,42,5
