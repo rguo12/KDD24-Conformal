@@ -27,6 +27,7 @@ propensity_mf/
 data/__pycache__/*
 models/__pycache__/*
 results
+debug_results/
 notebooks
 __pycache__/*
 
