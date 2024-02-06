@@ -27,7 +27,7 @@ methods=("tcp")
 
 for method in "${methods[@]}"
 do
-    python3 causal_TCP/run_syn.py \
+    python3  /opt/tiger/causal_TCP/run_syn.py \
     --cf_method $method \
     --density_ratio_model $dr_model \
     --n_obs $n_obs \
