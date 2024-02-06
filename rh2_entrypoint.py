@@ -43,7 +43,7 @@ seed = env.params.seed # only run tcp on arnold
 # local_save_path = "/mnt/bn/confrank2/causal_TCP/results/"
 # subprocess.call('''cd causal_TCP''', shell=True)
 
-local_save_path = "causal_TCP/results/"
+local_save_path = "/opt/tiger/causal_TCP/results/"
 if not os.path.exists(local_save_path):
     os.mkdir(local_save_path)
 local_save_path_ = os.path.join(local_save_path,dataset)
@@ -56,7 +56,7 @@ print(f"output folder is {output_folder}")
 
 # cmd = f'''python3 run_syn.py --dataset={dataset} --save_path={local_save_path}'''
 # for seed in range(1234,1239):
-cmd = f'''bash causal_TCP/run_tcp.sh {x_dim} {conf_strength} {n_estimators} {seed}'''
+cmd = f'''bash /opt/tiger/causal_TCP/run_tcp.sh {x_dim} {conf_strength} {n_estimators} {seed}'''
 print(f'cmd: {cmd}')
 exit_code = subprocess.call(cmd, shell=True)
 
