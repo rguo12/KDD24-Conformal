@@ -39,5 +39,5 @@ do
     --n_estimator $n_estimator \
     --n_folds $n_folds \
     --save_path "./results" \
-    --test_frac $test_frac &>> "./ad_hoc_logs/${dataset}/$(date +"%m_%d_%I_%M")_${method}.log"
+    --test_frac $test_frac
 done
