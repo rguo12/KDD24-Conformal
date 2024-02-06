@@ -26,8 +26,6 @@ env = get_rh2_env()
 
 x_dim = env.params.x_dim
 conf_strength = env.params.conf_strength
-# n_estimators= env.params.n_estimators
-
 seed = env.params.seed # only run tcp on arnold
 
 # n_inter_max = env.params.n_inter_max
@@ -42,7 +40,7 @@ seed = env.params.seed # only run tcp on arnold
 # n_Y_bins = env.params.n_Y_bins
 
 # local_save_path = "/mnt/bn/confrank2/causal_TCP/results/"
-# subprocess.call('''cd causal_TCP''', shell=True)
+subprocess.call('''cd causal_TCP''', shell=True)
 
 local_save_path = "/opt/tiger/causal_TCP/results/"
 if not os.path.exists(local_save_path):
