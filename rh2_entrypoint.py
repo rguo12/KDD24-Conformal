@@ -41,9 +41,9 @@ seed = env.params.seed # only run tcp on arnold
 # n_Y_bins = env.params.n_Y_bins
 
 # local_save_path = "/mnt/bn/confrank2/causal_TCP/results/"
-subprocess.call('''cd causal_TCP''', shell=True)
+# subprocess.call('''cd causal_TCP''', shell=True)
 
-local_save_path = "./results/"
+local_save_path = "causal_TCP/results/"
 if not os.path.exists(local_save_path):
     os.mkdir(local_save_path)
 local_save_path_ = os.path.join(local_save_path,dataset)
@@ -56,7 +56,7 @@ print(f"output folder is {output_folder}")
 
 # cmd = f'''python3 run_syn.py --dataset={dataset} --save_path={local_save_path}'''
 # for seed in range(1234,1239):
-cmd = f'''bash run_tcp.sh {x_dim} {conf_strength} {n_estimators} {seed}'''
+cmd = f'''bash causal_TCP/run_tcp.sh {x_dim} {conf_strength} {n_estimators} {seed}'''
 print(f'cmd: {cmd}')
 exit_code = subprocess.call(cmd, shell=True)
 
@@ -64,8 +64,8 @@ exit_code = subprocess.call(cmd, shell=True)
 if exit_code == 0:
     print("done")
     # subprocess.call(f'hadoop fs -copyFromLocal /opt/tiger/causal_TCP/results/{dataset}/* {output_folder}/{dataset}/', shell=True)
-    subprocess.call(f'hdfs dfs -put -f /opt/tiger/causal_TCP/results/{dataset}/* {output_folder}/{dataset}/', shell=True)
-    
+    # subprocess.call(f'hdfs dfs -put -f /opt/tiger/causal_TCP/results/{dataset}/* {output_folder}/{dataset}/', shell=True)
+    subprocess.call(f'sudo cp -r /opt/tiger/causal_TCP/results/{dataset}/* /mnt/bn/confrank2/causal_TCP/{dataset}/', shell=True)
     # client = create_or_get_rh2_client()
     # client.write_output_custom_meta(dataset, local_save_path, output_folder, 'PYTORCH', {
     #                                 'version': torch.__version__})
