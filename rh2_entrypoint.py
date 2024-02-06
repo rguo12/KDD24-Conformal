@@ -21,12 +21,13 @@ env = get_rh2_env()
 # output_model_id = env.outputs.output_model.id
 # output_model_path = env.outputs.output_model.meta.hdfs_dir
 
-dataset = env.params.dataset
-output_folder = env.params.output_folder
+# dataset = env.params.dataset
+# output_folder = env.params.output_folder
 
 x_dim = env.params.x_dim
 conf_strength = env.params.conf_strength
-n_estimators= env.params.n_estimators
+# n_estimators= env.params.n_estimators
+
 seed = env.params.seed # only run tcp on arnold
 
 # n_inter_max = env.params.n_inter_max
@@ -46,17 +47,17 @@ seed = env.params.seed # only run tcp on arnold
 local_save_path = "/opt/tiger/causal_TCP/results/"
 if not os.path.exists(local_save_path):
     os.mkdir(local_save_path)
-local_save_path_ = os.path.join(local_save_path,dataset)
+local_save_path_ = os.path.join(local_save_path,"cevae")
 if not os.path.exists(local_save_path_):
     os.mkdir(local_save_path_)
 
-print(f"output folder is {output_folder}")
+# print(f"output folder is {output_folder}")
 
 # train code
 
 # cmd = f'''python3 run_syn.py --dataset={dataset} --save_path={local_save_path}'''
 # for seed in range(1234,1239):
-cmd = f'''bash /opt/tiger/causal_TCP/run_tcp.sh {x_dim} {conf_strength} {n_estimators} {seed}'''
+cmd = f'''bash /opt/tiger/causal_TCP/run_tcp.sh {x_dim} {conf_strength} {seed}'''
 print(f'cmd: {cmd}')
 exit_code = subprocess.call(cmd, shell=True)
 
@@ -65,7 +66,7 @@ if exit_code == 0:
     print("done")
     # subprocess.call(f'hadoop fs -copyFromLocal /opt/tiger/causal_TCP/results/{dataset}/* {output_folder}/{dataset}/', shell=True)
     # subprocess.call(f'hdfs dfs -put -f /opt/tiger/causal_TCP/results/{dataset}/* {output_folder}/{dataset}/', shell=True)
-    subprocess.call(f'sudo cp -r /opt/tiger/causal_TCP/results/{dataset}/* /mnt/bn/confrank2/causal_TCP/{dataset}/', shell=True)
+    subprocess.call(f'sudo cp -r /opt/tiger/causal_TCP/results/cevae/* /mnt/bn/confrank2/causal_TCP/cevae/', shell=True)
     # client = create_or_get_rh2_client()
     # client.write_output_custom_meta(dataset, local_save_path, output_folder, 'PYTORCH', {
     #                                 'version': torch.__version__})

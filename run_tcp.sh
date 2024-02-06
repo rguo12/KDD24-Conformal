@@ -17,8 +17,9 @@ dr_use_Y=1
 
 x_dim=$1
 conf_strength=$2
-n_estimator=$3
-seed=$4
+seed=$3
+
+n_estimator=100
 
 methods=("tcp")
 
