@@ -2,7 +2,7 @@
 
 Code for the KDD '24 paper, [Conformal Counterfactual Inference under Hidden Confounding](https://arxiv.org/abs/2405.12387).
 
-**First Work on Causal Effect Estimation Based on Graph Convolutional Neural Networks**
+**First Work on Handling Hidden Confounding for Conformal Causal Inference without Assumptions on Bounds of Density Ratio**
 
 For now, please cite the arxiv version if you find this paper/repository is helpful.
 ```
