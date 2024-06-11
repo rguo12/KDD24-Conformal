@@ -59,7 +59,8 @@ def main(args):
     np.random.seed(args.seed)
 
     n_observation = args.n_obs
-    n_intervention_list = [100, 250, 500, 750, 1000]
+    n_intervention_list = [100, 250, 500, 750, 1000, 10, 20, 50]
+    # n_intervention_list = [10,20,50]
 
     print(n_intervention_list)
 
@@ -78,18 +79,6 @@ def main(args):
                                             d=args.x_dim, 
                                             err_scale=err_scale,
                                             hidden_conf=args.HC)
-        elif args.dataset == 'ihdp':
-            # as ihdp is a small dataset w. 740+ samples
-            # we only allow the n_intervention to be no larger than 500
-            if n_intervention > 500:
-                print("n_intervention must be no larger than 500 for ihdp dataset")
-                return
-            
-            df_o, df_i = IHDP_w_HC(n_intervention, args.seed, d=24,
-                hidden_confounding=True, beta_u=args.conf_strength, 
-                root="/mnt/bn/confrank2/causal_TCP/data/IHDP")
-
-            n_observation = df_o.shape[0]
 
         else:
             raise ValueError('select a dataset from [synthetic]')

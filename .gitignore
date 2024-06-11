@@ -59,3 +59,8 @@ iDCF/README.md
 iDCF/save_as_params.ipynb
 iDCF/tune_script.py
 iDCF/vae_exposure.py
+debug_results/
+job_def.yaml
+job_params.yaml
+rh2_entrypoint.py
+dist_figs/

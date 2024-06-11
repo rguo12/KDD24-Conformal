@@ -9,7 +9,7 @@ test_frac=0.02
 # methods=("inexact" "exact" "wcp" "naive")
 # methods=("TCP")
 
-dr_model="MLP"
+dr_model="DR"
 
 n_obs=10000
 
@@ -23,6 +23,7 @@ methods=("${@:4}")
 seeds=($(seq 1234 1238))
 
 # each run considers n_int = (100 500 1000 5000)
+
 for seed in "${seeds[@]}"
 do
     for method in "${methods[@]}"
