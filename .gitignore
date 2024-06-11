@@ -8,7 +8,7 @@ commands
 *.pkl
 *.bat
 *.pth
-*.png
+# *.png
 *.jpg
 *.sh
 *.pdf
@@ -20,6 +20,8 @@ iDCF/figs
 *.csv
 !run_syn.sh
 !run_tcp.sh
+!iDCF/run_coat.sh
+!iDCF/run_yahoo.sh
 
 wandb/
 data/IHDP
@@ -64,3 +66,5 @@ job_def.yaml
 job_params.yaml
 rh2_entrypoint.py
 dist_figs/
+
+figs/
