@@ -2,7 +2,7 @@
 
 Code for the KDD '24 paper, [Conformal Counterfactual Inference under Hidden Confounding](https://arxiv.org/abs/2405.12387).
 
-**First Work on Handling Hidden Confounding for Conformal Causal Inference without Assumptions on Bounds of Density Ratio**
+**First Work on Handling Hidden Confounding for Conformal Causal Inference without strong assumptions such as Bounds on the Density Ratio**
 
 For now, please cite the arxiv version if you find this paper/repository is helpful.
 ```
@@ -30,8 +30,8 @@ pip3 install -r requirements.txt
 
 Datasets used in this paper include
 - synthetic data simulated in run_syn.py
-- Yahoo!R3 dataset
-- Coat
+- [Yahoo!R3 dataset](https://webscope.sandbox.yahoo.com/)
+- [Coat](https://www.cs.cornell.edu/~schnabts/mnar/)
 
 ### Running the experiment
 
