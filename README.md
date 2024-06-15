@@ -1,5 +1,7 @@
 # Conformal Counterfactual Inference under Hidden Confounding (KDD’24)
 
+## Zonghao Chen*, Ruocheng Guo*, Jean-François Ton, Yang Liu
+
 Code for the KDD '24 paper, [Conformal Counterfactual Inference under Hidden Confounding](https://arxiv.org/abs/2405.12387).
 
 **First Work on Handling Hidden Confounding for Conformal Causal Inference without strong assumptions such as Bounds on the Density Ratio**
